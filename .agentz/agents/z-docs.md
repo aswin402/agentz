@@ -1,17 +1,18 @@
 ---
 description: AgentZ Docs subagent. Writes and updates documentation — README, inline comments, JSDoc, usage guides. Called by the agentz controller after implementation.
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.7
-tools:
-  read: true
-  bash: false
-  edit: true
-  write: true
-  glob: true
-  grep: true
-  webfetch: false
-  task: false
-  todowrite: false
+model: minimax/m2.7
+steps: 15
+permission:
+  edit: allow
+  write: allow
+  bash: deny
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: deny
+  task: deny
+  todowrite: deny
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):

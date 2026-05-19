@@ -1,17 +1,18 @@
 ---
 description: AgentZ Refactor subagent. Improves code structure, reduces duplication, and cleans up architecture — without changing external behavior. Called by the agentz controller.
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.7
-tools:
-  read: true
-  bash: true
-  edit: true
-  write: true
-  glob: true
-  grep: true
-  webfetch: false
-  task: false
-  todowrite: false
+model: minimax/m2.7
+steps: 30
+permission:
+  edit: allow
+  write: allow
+  bash: allow
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: deny
+  task: deny
+  todowrite: deny
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):

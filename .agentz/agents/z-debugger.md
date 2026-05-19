@@ -1,17 +1,18 @@
 ---
 description: AgentZ Debugger subagent. Reproduces bugs, identifies root causes, and implements targeted fixes. Called by the agentz controller when something is broken.
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.7
-tools:
-  read: true
-  bash: true
-  edit: true
-  write: true
-  glob: true
-  grep: true
-  webfetch: true
-  task: false
-  todowrite: false
+model: minimax/m2.7
+steps: 30
+permission:
+  edit: allow
+  write: allow
+  bash: allow
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: allow
+  task: deny
+  todowrite: deny
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):

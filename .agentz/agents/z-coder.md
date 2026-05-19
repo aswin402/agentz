@@ -1,17 +1,18 @@
 ---
 description: AgentZ Coder subagent. Implements features with professional-grade architecture — clean separation of concerns, strict types, proper error handling, small focused files. Called by the agentz controller with a specific coding task and plan.
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.7
-tools:
-  read: true
-  bash: true
-  edit: true
-  write: true
-  glob: true
-  grep: true
-  webfetch: true
-  task: false
-  todowrite: false
+model: minimax/m2.7
+steps: 40
+permission:
+  edit: allow
+  write: allow
+  bash: allow
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: allow
+  task: deny
+  todowrite: deny
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):
@@ -184,7 +185,7 @@ import type { User } from './types';                 // 4. types last
 1. **Create folder structure first** — `mkdir -p` all needed directories
 2. **Write types/interfaces first** — define data shapes before logic
 3. **Write bottom-up** — utilities → services → hooks → components → pages
-4. **Verify as you go:**
+4. **Verify as you go (IF APPLICABLE for JS/TS projects):**
    ```bash
    # TypeScript check after each major file
    npx tsc --noEmit 2>&1 | tail -20
@@ -201,7 +202,7 @@ import type { User } from './types';                 // 4. types last
 
 ## Step 4 — Quality Checklist
 
-Before reporting COMPLETED, verify every item:
+Before reporting COMPLETED, verify every item (only if applicable to the language/project type):
 
 - [ ] No TypeScript errors (`tsc --noEmit` passes)
 - [ ] No ESLint errors (if eslint is configured)

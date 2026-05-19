@@ -1,17 +1,18 @@
 ---
 description: AgentZ Planner subagent. Researches the web, GitHub, and docs before producing a structured, professional implementation plan. Called by the agentz controller before any implementation work.
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.7
-tools:
-  read: true
-  bash: true
-  edit: false
-  write: true
-  glob: true
-  grep: true
-  webfetch: true
-  task: false
-  todowrite: false
+model: minimax/m2.7
+steps: 20
+permission:
+  edit: deny
+  write: allow
+  bash: allow
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: allow
+  task: deny
+  todowrite: deny
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):
