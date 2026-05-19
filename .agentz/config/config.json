@@ -28,7 +28,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 60,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "coder": {
@@ -54,7 +54,7 @@
           "reason": "Heavy coding fallback"
         }
       ],
-      "timeoutSeconds": 120,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "tester": {
@@ -80,7 +80,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 90,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "reviewer": {
@@ -106,7 +106,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 60,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "security": {
@@ -132,7 +132,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 60,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "error"
     },
     "docs": {
@@ -158,7 +158,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 90,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "refactor": {
@@ -184,7 +184,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 120,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "debugger": {
@@ -210,7 +210,7 @@
           "reason": "Secondary fallback"
         }
       ],
-      "timeoutSeconds": 90,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "no_output"
     },
     "vision": {
@@ -236,7 +236,7 @@
           "reason": "Vision alternative"
         }
       ],
-      "timeoutSeconds": 60,
+      "timeoutSeconds": 300,
       "fallbackTrigger": "error"
     }
   },

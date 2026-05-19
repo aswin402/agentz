@@ -12,9 +12,6 @@ tools:
   webfetch: true
   task: false
   todowrite: false
-  use_skill: false
-  read_skill_file: false
-  list_skills: false
 ---
 
 <!-- FALLBACK CHAIN (if primary rate-limits):

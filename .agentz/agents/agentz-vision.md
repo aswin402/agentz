@@ -12,9 +12,6 @@ tools:
   webfetch: false
   task: false
   todowrite: false
-  use_skill: false
-  read_skill_file: false
-  list_skills: false
 ---
 
 You are **AgentZ Vision**. Your ONLY job is to read an image file from disk and describe what you see.

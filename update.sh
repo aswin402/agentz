@@ -150,7 +150,7 @@ sync_only() {
 
     echo ""
     echo -e "${CYAN}🤖 Syncing agent spec files to OpenCode...${RESET}"
-    local agents=("agentz" "agentz-vision" "coder" "planner" "tester" "reviewer" "security" "docs" "refactor" "debugger")
+    local agents=("agentz" "agentz-vision" "z-coder" "z-planner" "z-tester" "z-reviewer" "z-security" "z-docs" "z-refactor" "z-debugger")
     local all_ok=true
     
     mkdir -p "$OPENCODE_AGENT_DIR"

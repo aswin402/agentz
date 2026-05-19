@@ -29,7 +29,7 @@
 | **planner** | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/qwen-3-235b-a22b-instruct-2507` | `ollama-cloud/minimax-m2.7` | `opencode/qwen3.6-plus-free` |
 | **coder** | `mistral/devstral-small-2507` | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/gpt-oss-120b` | `nvidia/qwen/qwen3-coder-480b-a35b-instruct` |
 | **tester** | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/llama3.1-8b` | `mistral/codestral-latest` | `opencode/qwen3.6-plus-free` |
-| **reviewer** | `groq/qwen/qwen3-32b` | `cerebras/qwen-3-235b-a22b-instruct-2507` | `nvidia/meta/llama-3.3-70b-instruct` | `ollama-cloud/qwen3-next:80b` |
+| **reviewer** | `minimax-coding-plan/MiniMax-M2.7` | `groq/qwen/qwen3-32b` | `cerebras/qwen-3-235b-a22b-instruct-2507` | `nvidia/meta/llama-3.3-70b-instruct` |
 | **security** | `cerebras/qwen-3-235b-a22b-instruct-2507` | `groq/qwen/qwen3-32b` | `nvidia/meta/llama-guard-4-12b` | `groq/llama-3.3-70b-versatile` |
 | **docs** | `groq/llama-3.3-70b-versatile` | `mistral/mistral-small-latest` | `cerebras/gpt-oss-120b` | `ollama-cloud/gemma4:31b` |
 | **refactor** | `mistral/devstral-medium-latest` | `groq/qwen/qwen3-32b` | `cerebras/qwen-3-235b-a22b-instruct-2507` | `nvidia/qwen/qwen3.5-122b-a10b` |
