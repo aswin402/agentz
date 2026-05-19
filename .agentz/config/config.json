@@ -1,0 +1,126 @@
+{
+  "$schema": "./agentz.schema.json",
+
+  "primary": {
+    "model": "minimax/m2.7",
+    "role": "controller"
+  },
+
+  "agents": {
+    "planner": {
+      "modelChain": [
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast planning" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Good reasoning" },
+        { "provider": "huggingchat", "model": "mistral-coder", "reason": "Fallback" }
+      ],
+      "timeoutSeconds": 60,
+      "fallbackTrigger": "no_output"
+    },
+    "coder": {
+      "modelChain": [
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast coding" },
+        { "provider": "opencode", "model": "qwen3.5-coder", "reason": "Great at code" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Strong reasoning" },
+        { "provider": "zai", "model": "qwen-coder", "reason": "Coding specialized" },
+        { "provider": "mistral", "model": "codestral", "reason": "Code focused" }
+      ],
+      "timeoutSeconds": 120,
+      "fallbackTrigger": "no_output"
+    },
+    "tester": {
+      "modelChain": [
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast test writing" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Good test reasoning" },
+        { "provider": "opencode", "model": "qwen3.5-coder", "reason": "Can write tests" }
+      ],
+      "timeoutSeconds": 90,
+      "fallbackTrigger": "no_output"
+    },
+    "reviewer": {
+      "modelChain": [
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Code review" },
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast review" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Deep analysis" }
+      ],
+      "timeoutSeconds": 60,
+      "fallbackTrigger": "no_output"
+    },
+    "security": {
+      "modelChain": [
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Security analysis" },
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast scan" },
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Security patterns" }
+      ],
+      "timeoutSeconds": 60,
+      "fallbackTrigger": "error"
+    },
+    "docs": {
+      "modelChain": [
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast docs" },
+        { "provider": "google", "model": "gemini-2.0-flash", "reason": "Good at documentation" },
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Writing quality" }
+      ],
+      "timeoutSeconds": 90,
+      "fallbackTrigger": "no_output"
+    },
+    "refactor": {
+      "modelChain": [
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Refactoring patterns" },
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast refactor" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Deep analysis" }
+      ],
+      "timeoutSeconds": 120,
+      "fallbackTrigger": "no_output"
+    },
+    "debugger": {
+      "modelChain": [
+        { "provider": "groq", "model": "llama-4-scout", "reason": "Fast debugging" },
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Good at debugging" },
+        { "provider": "cerebras", "model": "cerebras-c4.1", "reason": "Deep reasoning" }
+      ],
+      "timeoutSeconds": 90,
+      "fallbackTrigger": "no_output"
+    },
+    "vision": {
+      "modelChain": [
+        { "provider": "cosecure", "model": "cosecure-vision", "reason": "Vision specialized" },
+        { "provider": "google", "model": "gemini-2.0-flash", "reason": "Multi-modal" },
+        { "provider": "openai", "model": "gpt-4o-mini", "reason": "Vision support" }
+      ],
+      "timeoutSeconds": 60,
+      "fallbackTrigger": "error"
+    }
+  },
+
+  "parallel": {
+    "maxAgents": 5,
+    "perProvider": {
+      "groq": 3,
+      "cerebras": 2,
+      "openai": 2,
+      "cosecure": 1,
+      "opencode": 2,
+      "zai": 2,
+      "google": 2,
+      "mistral": 2,
+      "huggingchat": 1
+    },
+    "perModel": {}
+  },
+
+  "verification": {
+    "autoFix": true,
+    "maxAttempts": 3,
+    "requireTests": true
+  },
+
+  "skills": {
+    "enable": ["playwright", "git-master", "frontend-ui-ux"],
+    "sources": [".agentz/skills"]
+  },
+
+  "specWorkflow": {
+    "autoApproveSimple": true,
+    "requireReviewComplex": true
+  }
+}

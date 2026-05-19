@@ -1,0 +1,39 @@
+{
+  "name": "agentz",
+  "version": "0.1.0",
+  "description": "Multi-model agent orchestration harness for OpenCode",
+  "type": "module",
+  "bin": {
+    "agentz": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "dev": "tsx watch src/cli/index.ts",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.6.1",
+    "zod": "^3.24.2",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "ora": "^8.2.0",
+    "execa": "^9.6.1",
+    "pathe": "^2.0.3",
+    "envinfo": "^7.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "tsx": "^4.19.3",
+    "vitest": "^3.1.1",
+    "eslint": "^9.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

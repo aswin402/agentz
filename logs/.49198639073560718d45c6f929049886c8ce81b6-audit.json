@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/aswin/programming/hermesprojects/agentz/logs/.49198639073560718d45c6f929049886c8ce81b6-audit.json",
+    "files": [
+        {
+            "date": 1779117163049,
+            "name": "/home/aswin/programming/hermesprojects/agentz/logs/mcp-puppeteer-2026-05-18.log",
+            "hash": "51da2885de16601677332fac0fbf51e0634c0536fab925d74bb407a67c4caa04"
+        }
+    ],
+    "hashType": "sha256"
+}
