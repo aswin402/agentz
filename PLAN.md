@@ -648,31 +648,35 @@ Spawn subagents for remaining tasks
 
 ## 13. Implementation Phases
 
-### Phase 1: Core Orchestrator (MVP)
-- [ ] Primary model controller prompt
-- [ ] Basic subagent spawning
-- [ ] Simple model chain routing
-- [ ] Shared memory system
-- [ ] Basic verification (syntax only)
+### Phase 1: Core Orchestrator (MVP) ✅ COMPLETE
+- [x] Primary model controller prompt (`src/core/controller.ts`)
+- [x] Basic subagent spawning with model routing
+- [x] Simple model chain routing (`src/agents/router.ts`)
+- [x] Shared memory system (`src/runtime/memory.ts`)
+- [x] Basic verification (`src/verification/pipeline.ts` — syntax + lint + tests + security)
 
-### Phase 2: Full Agent Suite
-- [ ] All 9 subagent specifications
-- [ ] IntentGate classification
-- [ ] Parallel execution with limits
-- [ ] Fallback chain management
-- [ ] Timeout handling
+### Phase 2: Full Agent Suite ✅ COMPLETE
+- [x] All 9 subagent specifications (`.agentz/agents/` — coder, planner, tester, vision, reviewer, security, docs, refactor, debugger)
+- [x] IntentGate classification (`src/agents/factory.ts:classifyIntent`)
+- [x] Parallel execution with concurrency limits (`executeTasksInParallel` + FIFO queue)
+- [x] Fallback chain management (`ModelRouter.shouldFallback`)
+- [x] Timeout handling (real `Promise.race` enforcement in `executeWithFallback`)
 
-### Phase 3: Verification & Quality
-- [ ] Verification gates (syntax, lint, tests)
-- [ ] Cross-agent review
-- [ ] Security scanning
-- [ ] Learning accumulation
+### Phase 3: Verification & Quality 🔄 IN PROGRESS
+- [x] Verification gates — syntax, lint, tests, security scans (`VerificationPipeline`)
+- [x] Cross-agent review (Reviewer agent spec + routing)
+- [x] Security scanning (Security agent spec + `checkSecurity` in pipeline)
+- [x] Learning accumulation (`SharedMemory.addLearning` + `learnings.md`)
+- [ ] Behavior gates (acceptance criteria verification — currently manual/pending)
+- [ ] Rate-limit quota tracking per provider
 
-### Phase 4: Advanced Features
-- [ ] Vision agent with image handling
-- [ ] Session continuity (boulder)
-- [ ] Skills system
-- [ ] Spec-first workflow UI
+### Phase 4: Advanced Features 🔄 IN PROGRESS
+- [x] Vision agent with image handling (`agentz-vision` OpenCode agent + `IMAGE_PATH:` protocol)
+- [x] Session continuity (boulder.json system)
+- [x] Skills system (`loadSkills` in controller + `.agentz/skills/`)
+- [ ] TUI monitor dashboard (real-time agent status — not yet built)
+- [ ] Config sync command (`agentz sync` — opencode config ↔ TypeScript config)
+- [ ] `agentz diagnose` — provider health check CLI command
 
 ---
 

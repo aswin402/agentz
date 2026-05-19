@@ -79,17 +79,19 @@ Edit `.agentz/config.json` to customize:
 
 ## Subagent Model Chains
 
-| Agent | Default Chain | Timeout |
-|-------|---------------|---------|
-| **Planner** | Groq → Cerebras → HuggingChat | 60s |
-| **Coder** | Groq → OpenCode → Cerebras → Z.ai → Mistral | 120s |
-| **Tester** | Groq → Cerebras → OpenCode | 90s |
-| **Reviewer** | OpenAI → Groq → Cerebras | 60s |
-| **Security** | Cerebras → Groq → OpenAI | 60s |
-| **Docs** | Groq → Google → OpenAI | 90s |
-| **Refactor** | OpenAI → Groq → Cerebras | 120s |
-| **Debugger** | Groq → OpenAI → Cerebras | 90s |
-| **Vision** | Cosecure → Google → OpenAI | 60s |
+> All models verified live via API. See [workingmodelstab.md](./workingmodelstab.md) for full provider reference.
+
+| Agent | Primary Model | Fallback Chain | Timeout |
+|-------|--------------|----------------|---------|
+| **Planner** | `groq/llama-4-scout-17b-16e-instruct` | Cerebras Qwen3-235B → Ollama MiniMax-M2.7 → OpenCode | 60s |
+| **Coder** | `mistral/devstral-small-2507` | Groq Llama-4-Scout → Cerebras GPT-OSS-120B → NVIDIA Qwen3-Coder-480B | 120s |
+| **Tester** | `groq/llama-4-scout-17b-16e-instruct` | Cerebras Llama3.1-8B → Mistral Codestral → OpenCode | 90s |
+| **Reviewer** | `groq/qwen/qwen3-32b` | Cerebras Qwen3-235B → NVIDIA Llama-3.3-70B → Ollama Qwen3-Next-80B | 60s |
+| **Security** | `cerebras/qwen-3-235b-a22b-instruct-2507` | Groq Qwen3-32B → NVIDIA Llama Guard 4 → Groq Llama-3.3-70B | 60s |
+| **Docs** | `groq/llama-3.3-70b-versatile` | Mistral Small → Cerebras GPT-OSS-120B → Ollama Gemma4-31B | 90s |
+| **Refactor** | `mistral/devstral-medium-latest` | Groq Qwen3-32B → Cerebras Qwen3-235B → NVIDIA Qwen3.5-122B | 120s |
+| **Debugger** | `groq/llama-4-scout-17b-16e-instruct` | Cerebras Qwen3-235B → NVIDIA DeepSeek-V4-Flash → Groq Llama-3.3-70B | 90s |
+| **Vision** | `google/gemini-2.5-flash` | Google Flash-Preview → NVIDIA Llama-3.2-11B-Vision → NVIDIA Llama-3.2-90B-Vision | 60s |
 
 ## Commands
 

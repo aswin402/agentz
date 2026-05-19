@@ -13,6 +13,7 @@ export declare class PrimaryController extends EventEmitter {
     private primaryModel;
     private request;
     private loadedSkills;
+    private taskQueue;
     constructor(projectRoot?: string);
     private loadSkills;
     private getSkillsForAgent;
@@ -27,6 +28,10 @@ export declare class PrimaryController extends EventEmitter {
     private executePlan;
     private executeTask;
     private executeTasksInParallel;
+    /**
+     * Drain the FIFO task queue, spawning queued tasks as concurrency allows.
+     */
+    private drainTaskQueue;
     private executeWithFallback;
     private executeSubagent;
     private verifyCurrentProgress;

@@ -6,113 +6,288 @@ set -e
 # =============================================================================
 # Rebuilds AgentZ from source and re-syncs all config/agent files.
 # Run from the repo root: ./update.sh
+#
+# Subcommands:
+#   ./update.sh          — full update (deps + build + sync)
+#   ./update.sh sync     — sync configs only, no build
+#   ./update.sh diff     — show what would change in agentz-config.json, no write
 # =============================================================================
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENCODE_CONFIG_DIR="$HOME/.config/opencode"
-OPENCODE_AGENT_DIR="$OPENCODE_CONFIG_DIR/agent"   # singular — OpenCode's real dir
+OPENCODE_AGENT_DIR="$OPENCODE_CONFIG_DIR/agent"
 AGENTZ_RUNTIME_DIR="$CURRENT_DIR/.agentz"
+SOURCE_CONFIG="$AGENTZ_RUNTIME_DIR/config/config.json"
+DEST_CONFIG="$OPENCODE_CONFIG_DIR/agentz-config.json"
 
-echo "🔄 Updating AgentZ..."
-echo ""
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
-# ─── Step 1: Ensure directories exist ────────────────────────────────────────
-echo "📁 Ensuring directories..."
-mkdir -p "$OPENCODE_AGENT_DIR"
-mkdir -p "$AGENTZ_RUNTIME_DIR/memory"
-mkdir -p "$AGENTZ_RUNTIME_DIR/skills"
-mkdir -p "$AGENTZ_RUNTIME_DIR/tasks"
-mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/active/subagent-status"
-mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/sessions"
-mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/history"
+# ─── Shared Python comparator — call as: _config_diff src dst ────────────────
+_config_diff() {
+    local src="$1" dst="$2"
+    python3 - "$src" "$dst" <<'PYEOF'
+import json, sys
 
-# ─── Step 2: Verify OpenCode agent files ─────────────────────────────────────
-echo "🤖 Checking OpenCode agent files..."
+with open(sys.argv[1]) as f: src = json.load(f)
+with open(sys.argv[2]) as f: dst = json.load(f)
 
-if [ -f "$OPENCODE_AGENT_DIR/agentz.md" ]; then
-    echo "   ✓ agentz (primary) present"
-else
-    echo "   ⚠️  agentz.md missing from $OPENCODE_AGENT_DIR — image/vision delegation won't work"
-fi
+changes = []
 
-if [ -f "$OPENCODE_AGENT_DIR/agentz-vision.md" ]; then
-    echo "   ✓ agentz-vision (subagent) present"
-else
-    echo "   ⚠️  agentz-vision.md missing — vision subagent not available"
-fi
+src_agents = src.get('agents', {})
+dst_agents = dst.get('agents', {})
+all_keys = sorted(set(src_agents) | set(dst_agents))
 
-# ─── Step 3: Sync OpenCode config ────────────────────────────────────────────
-echo "⚙️  Syncing OpenCode configuration..."
-if [ -f "$AGENTZ_RUNTIME_DIR/config/config.json" ]; then
-    cp "$AGENTZ_RUNTIME_DIR/config/config.json" "$OPENCODE_CONFIG_DIR/agentz-config.json"
-    echo "   ✓ Config synced → $OPENCODE_CONFIG_DIR/agentz-config.json"
-else
-    echo "   ⚠️  No .agentz/config/config.json — skipping config sync"
-fi
+for agent in all_keys:
+    if agent not in dst_agents:
+        changes.append(f"  + [{agent}] NEW agent (not in destination)")
+        continue
+    if agent not in src_agents:
+        changes.append(f"  - [{agent}] removed (not in source)")
+        continue
 
-# ─── Step 4: Re-install dependencies ─────────────────────────────────────────
-echo "📦 Installing npm dependencies..."
-cd "$CURRENT_DIR"
-npm install --silent 2>/dev/null || npm install
+    sc = [f"{e['provider']}/{e['model']}" for e in src_agents[agent].get('modelChain', [])]
+    dc = [f"{e['provider']}/{e['model']}" for e in dst_agents[agent].get('modelChain', [])]
+    st = src_agents[agent].get('timeoutSeconds')
+    dt = dst_agents[agent].get('timeoutSeconds')
 
-# ─── Step 5: Rebuild ─────────────────────────────────────────────────────────
-echo "🔨 Rebuilding..."
-npm run build
+    if sc != dc or st != dt:
+        changes.append(f"  ~ [{agent}]")
+        for i, (old, new) in enumerate(zip(dc, sc)):
+            if old != new:
+                changes.append(f"      #{i+1}: {old}")
+                changes.append(f"          → {new}")
+        for entry in sc[len(dc):]:
+            changes.append(f"      + {entry}  (added)")
+        for entry in dc[len(sc):]:
+            changes.append(f"      - {entry}  (removed)")
+        if st != dt:
+            changes.append(f"      timeout: {dt}s → {st}s")
 
-# ─── Step 6: Verify CLI alias is set ─────────────────────────────────────────
-echo "🔗 Verifying agentz CLI alias..."
+sp = src.get('primary', {}).get('model', '')
+dp = dst.get('primary', {}).get('model', '')
+if sp != dp:
+    changes.append(f"  ~ [primary] {dp} → {sp}")
 
-AGENTZ_CLI="$CURRENT_DIR/dist/cli/index.js"
+print('\n'.join(changes) if changes else 'NO_CHANGES')
+PYEOF
+}
 
-for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-    if [ -f "$rc" ]; then
-        if grep -q "alias agentz=" "$rc" 2>/dev/null; then
-            echo "   ✓ agentz alias present in $rc"
+# =============================================================================
+# sync_config — compare + overwrite agentz-config.json from repo source
+# =============================================================================
+sync_config() {
+    echo -e "${CYAN}⚙️  Syncing agentz-config.json...${RESET}"
+
+    if [ ! -f "$SOURCE_CONFIG" ]; then
+        echo -e "   ${RED}❌ Source not found: $SOURCE_CONFIG${RESET}"
+        echo "      Create .agentz/config/config.json first."
+        return 1
+    fi
+
+    mkdir -p "$OPENCODE_CONFIG_DIR"
+
+    if [ -f "$DEST_CONFIG" ]; then
+        local diff_out
+        diff_out=$(_config_diff "$SOURCE_CONFIG" "$DEST_CONFIG")
+
+        if [ "$diff_out" = "NO_CHANGES" ]; then
+            echo -e "   ${GREEN}✓ Already in sync — nothing to do${RESET}"
+            return 0
+        fi
+
+        echo -e "   ${YELLOW}📋 Changes to be applied:${RESET}"
+        echo "$diff_out"
+        echo ""
+    else
+        echo -e "   ${YELLOW}ℹ️  No existing agentz-config.json — creating fresh${RESET}"
+    fi
+
+    cp "$SOURCE_CONFIG" "$DEST_CONFIG"
+    echo -e "   ${GREEN}✓ Synced → $DEST_CONFIG${RESET}"
+}
+
+# =============================================================================
+# diff_only — show what would change, no write
+# =============================================================================
+diff_only() {
+    echo -e "${BOLD}AgentZ Config Diff${RESET}"
+    echo -e "  Source: ${BOLD}$SOURCE_CONFIG${RESET}"
+    echo -e "  Target: ${BOLD}$DEST_CONFIG${RESET}"
+    echo ""
+
+    if [ ! -f "$SOURCE_CONFIG" ]; then
+        echo -e "${RED}❌ Source config not found${RESET}"
+        exit 1
+    fi
+
+    if [ ! -f "$DEST_CONFIG" ]; then
+        echo -e "${YELLOW}ℹ️  No destination config — full file would be written${RESET}"
+        exit 0
+    fi
+
+    local diff_out
+    diff_out=$(_config_diff "$SOURCE_CONFIG" "$DEST_CONFIG")
+
+    if [ "$diff_out" = "NO_CHANGES" ]; then
+        echo -e "${GREEN}✓ Configs are identical — no changes needed${RESET}"
+    else
+        echo -e "${YELLOW}Changes that would be applied:${RESET}"
+        echo "$diff_out"
+        echo ""
+        echo -e "Run ${BOLD}./update.sh sync${RESET} to apply."
+    fi
+}
+
+# =============================================================================
+# sync_only — sync configs + check agent files, no build
+# =============================================================================
+sync_only() {
+    echo -e "${BOLD}🔄 AgentZ Config Sync${RESET}"
+    echo ""
+
+    sync_config
+
+    echo ""
+    echo -e "${CYAN}🤖 Syncing agent spec files to OpenCode...${RESET}"
+    local agents=("agentz" "agentz-vision" "coder" "planner" "tester" "reviewer" "security" "docs" "refactor" "debugger")
+    local all_ok=true
+    
+    mkdir -p "$OPENCODE_AGENT_DIR"
+    
+    for agent in "${agents[@]}"; do
+        local spec="$AGENTZ_RUNTIME_DIR/agents/${agent}.md"
+        if [ -f "$spec" ]; then
+            cp "$spec" "$OPENCODE_AGENT_DIR/${agent}.md"
+            echo -e "   ${GREEN}✓${RESET} Synced ${agent}.md"
         else
-            {
-                echo ""
-                echo "# AgentZ"
-                echo "alias agentz='node $AGENTZ_CLI'"
-            } >> "$rc"
-            echo "   ✓ Added agentz alias to $rc"
+            echo -e "   ${RED}❌${RESET} ${agent}.md — missing from .agentz/agents/"
+            all_ok=false
+        fi
+    done
+
+    echo ""
+    if [ "$all_ok" = true ]; then
+        echo -e "${GREEN}✅ Sync complete${RESET}"
+    else
+        echo -e "${YELLOW}⚠️  Sync complete with warnings${RESET}"
+    fi
+    echo ""
+    echo -e "   Config: ${BOLD}$DEST_CONFIG${RESET}"
+    echo -e "   Agents: ${BOLD}$OPENCODE_AGENT_DIR/${RESET}"
+    echo ""
+    echo -e "🚀 Restart OpenCode to pick up any changes."
+    echo ""
+}
+
+# =============================================================================
+# full_update — deps + build + sync (default)
+# =============================================================================
+full_update() {
+    echo -e "${BOLD}🔄 Updating AgentZ...${RESET}"
+    echo ""
+
+    # Step 1: Directories
+    echo -e "${CYAN}📁 Ensuring directories...${RESET}"
+    mkdir -p "$OPENCODE_AGENT_DIR"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/memory"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/skills"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/tasks"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/active/subagent-status"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/sessions"
+    mkdir -p "$AGENTZ_RUNTIME_DIR/runtime/history"
+    echo -e "   ${GREEN}✓${RESET} Directories ready"
+
+    # Step 2: OpenCode agent presence check
+    echo ""
+    echo -e "${CYAN}🤖 Checking OpenCode agent files...${RESET}"
+    for af in "agentz.md" "agentz-vision.md"; do
+        if [ -f "$OPENCODE_AGENT_DIR/$af" ]; then
+            echo -e "   ${GREEN}✓${RESET} $af"
+        else
+            echo -e "   ${YELLOW}⚠️${RESET}  $af missing from $OPENCODE_AGENT_DIR"
+        fi
+    done
+
+    # Step 3: Sync config (with diff preview)
+    echo ""
+    sync_config
+
+    # Step 4: npm install
+    echo ""
+    echo -e "${CYAN}📦 Installing npm dependencies...${RESET}"
+    cd "$CURRENT_DIR"
+    npm install --silent 2>/dev/null || npm install
+    echo -e "   ${GREEN}✓${RESET} Dependencies up to date"
+
+    # Step 5: Build
+    echo ""
+    echo -e "${CYAN}🔨 Rebuilding...${RESET}"
+    npm run build
+    echo -e "   ${GREEN}✓${RESET} Build complete"
+
+    # Step 6: CLI alias
+    echo ""
+    echo -e "${CYAN}🔗 Verifying agentz CLI alias...${RESET}"
+    local agentz_cli="$CURRENT_DIR/dist/cli/index.js"
+    for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+        if [ -f "$rc" ]; then
+            if grep -q "alias agentz=" "$rc" 2>/dev/null; then
+                echo -e "   ${GREEN}✓${RESET} alias present in $(basename $rc)"
+            else
+                { echo ""; echo "# AgentZ"; echo "alias agentz='node $agentz_cli'"; } >> "$rc"
+                echo -e "   ${GREEN}✓${RESET} Added alias to $(basename $rc)"
+            fi
+        fi
+    done
+
+    # Step 7: Sanity check
+    echo ""
+    echo -e "${CYAN}🔍 Sanity check...${RESET}"
+    if [ -f "$CURRENT_DIR/dist/cli/index.js" ]; then
+        echo -e "   ${GREEN}✓${RESET} dist/cli/index.js built"
+    else
+        echo -e "   ${RED}❌ Build output missing${RESET}"
+        exit 1
+    fi
+
+    if command -v opencode &>/dev/null; then
+        local agent_list
+        agent_list=$(opencode agent list 2>/dev/null || echo "")
+        if echo "$agent_list" | grep -q "agentz"; then
+            echo -e "   ${GREEN}✓${RESET} agentz visible in opencode agent list"
+        else
+            echo -e "   ${YELLOW}⚠️${RESET}  agentz not detected — restart OpenCode"
+        fi
+        if echo "$agent_list" | grep -q "agentz-vision"; then
+            echo -e "   ${GREEN}✓${RESET} agentz-vision visible"
         fi
     fi
-done
 
-# ─── Step 7: Quick sanity check ──────────────────────────────────────────────
-echo "🔍 Sanity check..."
+    echo ""
+    echo -e "${GREEN}${BOLD}✅ AgentZ updated!${RESET}"
+    echo ""
+    echo -e "   Repo:    ${BOLD}$CURRENT_DIR${RESET}"
+    echo -e "   Config:  ${BOLD}$DEST_CONFIG${RESET}"
+    echo -e "   Agents:  ${BOLD}$OPENCODE_AGENT_DIR/${RESET}"
+    echo ""
+    echo -e "🚀 Restart OpenCode if agent prompts were edited."
+    echo ""
+}
 
-if [ -f "$CURRENT_DIR/dist/cli/index.js" ]; then
-    echo "   ✓ dist/cli/index.js built"
-else
-    echo "   ❌ Build output missing — check npm run build output above"
-    exit 1
-fi
-
-if [ -f "$OPENCODE_AGENT_DIR/agentz.md" ]; then
-    echo "   ✓ OpenCode agent registered"
-fi
-
-# Check opencode can see agents
-if command -v opencode &>/dev/null; then
-    AGENT_LIST=$(opencode agent list 2>/dev/null || echo "")
-    if echo "$AGENT_LIST" | grep -q "agentz"; then
-        echo "   ✓ agentz visible in opencode agent list"
-    else
-        echo "   ⚠️  agentz not detected by opencode — restart OpenCode to pick up changes"
-    fi
-    if echo "$AGENT_LIST" | grep -q "agentz-vision"; then
-        echo "   ✓ agentz-vision visible in opencode agent list"
-    fi
-fi
-
-echo ""
-echo "✅ AgentZ updated!"
-echo ""
-echo "   Repo:          $CURRENT_DIR"
-echo "   Primary agent: $OPENCODE_AGENT_DIR/agentz.md"
-echo "   Vision agent:  $OPENCODE_AGENT_DIR/agentz-vision.md"
-echo "   Config:        $OPENCODE_CONFIG_DIR/agentz-config.json"
-echo ""
-echo "🚀 Changes are live — restart OpenCode if agent prompts were edited."
-echo ""
+# =============================================================================
+# Entry point
+# =============================================================================
+case "${1:-}" in
+    sync) sync_only ;;
+    diff) diff_only ;;
+    "")   full_update ;;
+    *)
+        echo "Usage: ./update.sh [sync|diff]"
+        echo ""
+        echo "  (no args)  — full update: deps + build + config sync"
+        echo "  sync       — sync agentz-config.json and verify agent files, no build"
+        echo "  diff       — show what would change in agentz-config.json, no write"
+        exit 1
+        ;;
+esac

@@ -117,8 +117,9 @@ export class ModelRouter {
         if (taskComplexity === "low") {
             return chain.modelChain[0];
         }
-        // For medium, try second in chain if first is too slow
-        return chain.modelChain[0];
+        // For medium, use second model in chain (balanced speed/quality)
+        // Falls back to first if chain only has one entry
+        return chain.modelChain[1] ?? chain.modelChain[0];
     }
     /**
      * Get provider info
@@ -177,11 +178,18 @@ export function formatModelId(provider, model) {
     return `${provider}/${model}`;
 }
 export function parseModelId(modelId) {
-    const parts = modelId.split("/");
-    if (parts.length !== 2) {
-        return null;
+    // Model IDs can have 2 or 3 segments, e.g.:
+    //   groq/llama-3.3-70b-versatile          → provider=groq, model=llama-3.3-70b-versatile
+    //   nvidia/meta/llama-guard-4-12b          → provider=nvidia, model=meta/llama-guard-4-12b
+    //   groq/meta-llama/llama-4-scout-17b-... → provider=groq, model=meta-llama/llama-4-scout-...
+    const slashIndex = modelId.indexOf("/");
+    if (slashIndex === -1) {
+        return null; // No slash at all — invalid
     }
-    return { provider: parts[0], model: parts[1] };
+    return {
+        provider: modelId.slice(0, slashIndex),
+        model: modelId.slice(slashIndex + 1),
+    };
 }
 export function getModelDisplayName(provider, model) {
     const info = FREE_PROVIDERS[provider];

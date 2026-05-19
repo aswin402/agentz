@@ -7,9 +7,10 @@ export const AGENT_SPECS = {
         name: "Planner",
         description: "Strategic planning agent that analyzes requirements, identifies gaps, and creates implementation plans",
         modelChain: [
-            { provider: "groq", model: "llama-4-scout", reason: "Fast planning" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Good reasoning" },
-            { provider: "huggingchat", model: "mistral-coder", reason: "Fallback" },
+            { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "Fast planning" },
+            { provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", reason: "Good reasoning" },
+            { provider: "ollama-cloud", model: "minimax-m2.7", reason: "Fallback" },
+            { provider: "opencode", model: "qwen3.6-plus-free", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 60,
         capabilities: ["code_read", "web_search", "web_fetch", "bash_execute"],
@@ -19,11 +20,10 @@ export const AGENT_SPECS = {
         name: "Coder",
         description: "Implementation agent that writes actual code, creates files, and modifies existing code",
         modelChain: [
-            { provider: "groq", model: "llama-4-scout", reason: "Fast coding" },
-            { provider: "opencode", model: "qwen3.5-coder", reason: "Great at code" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Strong reasoning" },
-            { provider: "zai", model: "qwen-coder", reason: "Coding specialized" },
-            { provider: "mistral", model: "codestral", reason: "Code focused" },
+            { provider: "mistral", model: "devstral-small-2507", reason: "Best free coding agent" },
+            { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "Fast coding fallback" },
+            { provider: "cerebras", model: "gpt-oss-120b", reason: "Strong reasoning" },
+            { provider: "nvidia", model: "qwen/qwen3-coder-480b-a35b-instruct", reason: "Heavy coding fallback" },
         ],
         timeoutSeconds: 120,
         capabilities: ["code_read", "code_write", "code_edit", "bash_execute", "file_create"],
@@ -33,9 +33,10 @@ export const AGENT_SPECS = {
         name: "Tester",
         description: "Testing agent that writes tests, executes test suites, and verifies code behavior",
         modelChain: [
-            { provider: "groq", model: "llama-4-scout", reason: "Fast test writing" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Good test reasoning" },
-            { provider: "opencode", model: "qwen3.5-coder", reason: "Can write tests" },
+            { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "Fast test writing" },
+            { provider: "cerebras", model: "llama3.1-8b", reason: "Ultra-fast testing" },
+            { provider: "mistral", model: "codestral-latest", reason: "Code completion" },
+            { provider: "opencode", model: "qwen3.6-plus-free", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 90,
         capabilities: ["code_read", "test_write", "test_execute", "bash_execute"],
@@ -45,9 +46,10 @@ export const AGENT_SPECS = {
         name: "Reviewer",
         description: "Code review agent that evaluates code quality, best practices, and provides improvement suggestions",
         modelChain: [
-            { provider: "openai", model: "gpt-4o-mini", reason: "Code review" },
-            { provider: "groq", model: "llama-4-scout", reason: "Fast review" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Deep analysis" },
+            { provider: "groq", model: "qwen/qwen3-32b", reason: "Strong reviewer" },
+            { provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", reason: "Deep analysis" },
+            { provider: "nvidia", model: "meta/llama-3.3-70b-instruct", reason: "Complex review" },
+            { provider: "ollama-cloud", model: "qwen3-next:80b", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 60,
         capabilities: ["code_read", "web_search", "bash_execute"],
@@ -57,9 +59,10 @@ export const AGENT_SPECS = {
         name: "Security",
         description: "Security agent that scans for vulnerabilities, checks for unsafe patterns, and validates authentication",
         modelChain: [
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Security analysis" },
-            { provider: "groq", model: "llama-4-scout", reason: "Fast scan" },
-            { provider: "openai", model: "gpt-4o-mini", reason: "Security patterns" },
+            { provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", reason: "Security analysis" },
+            { provider: "groq", model: "qwen/qwen3-32b", reason: "Fast scan" },
+            { provider: "nvidia", model: "meta/llama-guard-4-12b", reason: "Safety specialized" },
+            { provider: "groq", model: "llama-3.3-70b-versatile", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 60,
         capabilities: ["code_read", "security_scan", "web_search"],
@@ -69,9 +72,10 @@ export const AGENT_SPECS = {
         name: "Docs",
         description: "Documentation agent that updates README, comments, and usage documentation",
         modelChain: [
-            { provider: "groq", model: "llama-4-scout", reason: "Fast docs" },
-            { provider: "google", model: "gemini-2.0-flash", reason: "Good at documentation" },
-            { provider: "openai", model: "gpt-4o-mini", reason: "Writing quality" },
+            { provider: "groq", model: "llama-3.3-70b-versatile", reason: "Best writing quality" },
+            { provider: "mistral", model: "mistral-small-latest", reason: "Fast general tasks" },
+            { provider: "cerebras", model: "gpt-oss-120b", reason: "Deep reasoning" },
+            { provider: "ollama-cloud", model: "gemma4:31b", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 90,
         capabilities: ["code_read", "docs_write", "file_create"],
@@ -81,9 +85,10 @@ export const AGENT_SPECS = {
         name: "Refactor",
         description: "Refactoring agent that improves code architecture without changing behavior",
         modelChain: [
-            { provider: "openai", model: "gpt-4o-mini", reason: "Refactoring patterns" },
-            { provider: "groq", model: "llama-4-scout", reason: "Fast refactor" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Deep analysis" },
+            { provider: "mistral", model: "devstral-medium-latest", reason: "Agentic + larger context" },
+            { provider: "groq", model: "qwen/qwen3-32b", reason: "Fast refactor" },
+            { provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", reason: "Deep analysis" },
+            { provider: "nvidia", model: "qwen/qwen3.5-122b-a10b", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 120,
         capabilities: ["code_read", "code_edit", "bash_execute"],
@@ -93,9 +98,10 @@ export const AGENT_SPECS = {
         name: "Debugger",
         description: "Debugging agent that reproduces bugs, identifies root causes, and suggests fixes",
         modelChain: [
-            { provider: "groq", model: "llama-4-scout", reason: "Fast debugging" },
-            { provider: "openai", model: "gpt-4o-mini", reason: "Good at debugging" },
-            { provider: "cerebras", model: "cerebras-c4.1", reason: "Deep reasoning" },
+            { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "Fast debugging" },
+            { provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", reason: "Deep reasoning" },
+            { provider: "nvidia", model: "deepseek-ai/deepseek-v4-flash", reason: "Fast coding" },
+            { provider: "groq", model: "llama-3.3-70b-versatile", reason: "Secondary fallback" },
         ],
         timeoutSeconds: 90,
         capabilities: ["code_read", "code_edit", "bash_execute", "web_search"],
@@ -105,9 +111,10 @@ export const AGENT_SPECS = {
         name: "Vision",
         description: "Vision agent that analyzes images, screenshots, and UI designs to provide context",
         modelChain: [
-            { provider: "cosecure", model: "cosecure-vision", reason: "Vision specialized" },
-            { provider: "google", model: "gemini-2.0-flash", reason: "Multi-modal" },
-            { provider: "openai", model: "gpt-4o-mini", reason: "Vision support" },
+            { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - best quality+speed" },
+            { provider: "nvidia", model: "meta/llama-3.2-11b-vision-instruct", reason: "Vision fallback" },
+            { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Complex image understanding" },
+            { provider: "google", model: "gemini-2.5-flash-preview-05-20", reason: "Vision alternative" },
         ],
         timeoutSeconds: 60,
         capabilities: ["image_analysis", "code_read", "web_fetch"],
@@ -140,6 +147,15 @@ ${capabilityList}
 ## Current Task
 ${context.task}
 `;
+        if (context.artifacts && context.artifacts.length > 0) {
+            prompt += `
+## Attached Artifacts
+${context.artifacts.map((a) => `- ${a}`).join("\n")}
+`;
+            if (type === "vision") {
+                prompt += `\nIMAGE_PATH: ${context.artifacts.join(", ")}\n`;
+            }
+        }
         if (context.sharedMemory) {
             prompt += `
 
@@ -287,25 +303,25 @@ export const FREE_PROVIDERS = {
     groq: {
         name: "Groq",
         baseUrl: "https://api.groq.com/openai/v1",
-        models: ["llama-4-scout", "llama-4-marble", "mixtral-8x7b"],
+        models: ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "qwen/qwen3-32b", "openai/gpt-oss-120b"],
         bestFor: ["fast coding", "planning", "quick tasks"],
     },
     cerebras: {
         name: "Cerebras",
         baseUrl: "https://api.cerebras.ai/v1",
-        models: ["cerebras-c4.1", "llama-3.3-70b"],
+        models: ["qwen-3-235b-a22b-instruct-2507", "gpt-oss-120b", "llama3.1-8b"],
         bestFor: ["reasoning", "security", "deep analysis"],
     },
     opencode: {
-        name: "OpenCode",
+        name: "OpenCode Zen",
         baseUrl: "https://opencode.ai/api/v1",
-        models: ["qwen3.5-coder", "deepseek-coder"],
+        models: ["qwen3.6-plus-free", "deepseek-v4-flash-free"],
         bestFor: ["coding", "debugging"],
     },
     zai: {
         name: "Z.ai",
         baseUrl: "https://api.z.ai/v1",
-        models: ["qwen-coder", "glm-coder"],
+        models: ["glm-4.7", "glm-5.1"],
         bestFor: ["coding tasks"],
     },
     cosecure: {
@@ -317,14 +333,20 @@ export const FREE_PROVIDERS = {
     google: {
         name: "Google AI",
         baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-        models: ["gemini-2.0-flash", "gemini-1.5-flash"],
-        bestFor: ["docs", "fast tasks", "multi-modal"],
+        models: ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-preview-05-20"],
+        bestFor: ["vision", "docs", "multi-modal"],
     },
     mistral: {
         name: "Mistral",
         baseUrl: "https://api.mistral.ai/v1",
-        models: ["codestral", "pixtral"],
-        bestFor: ["coding", "vision"],
+        models: ["devstral-small-2507", "devstral-medium-latest", "codestral-latest", "mistral-small-latest"],
+        bestFor: ["coding", "refactoring"],
+    },
+    nvidia: {
+        name: "NVIDIA NIM",
+        baseUrl: "https://integrate.api.nvidia.com/v1",
+        models: ["meta/llama-3.2-11b-vision-instruct", "meta/llama-3.2-90b-vision-instruct", "qwen/qwen3-coder-480b-a35b-instruct", "meta/llama-3.3-70b-instruct", "meta/llama-guard-4-12b", "deepseek-ai/deepseek-v4-flash"],
+        bestFor: ["heavy coding", "vision", "security"],
     },
     openai: {
         name: "OpenAI",
@@ -337,6 +359,12 @@ export const FREE_PROVIDERS = {
         baseUrl: "https://api.huggingface.co/v1",
         models: ["mistral-coder", "llama-3.1"],
         bestFor: ["light tasks", "fallback"],
+    },
+    "ollama-cloud": {
+        name: "Ollama Cloud",
+        baseUrl: "https://api.ollama.cloud/v1",
+        models: ["minimax-m2.7", "qwen3-next:80b", "gemma4:31b"],
+        bestFor: ["fallback", "variety"],
     },
 };
 export default AgentFactory;

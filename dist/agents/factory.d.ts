@@ -9,6 +9,7 @@ export declare class AgentFactory {
         sharedMemory?: string;
         skills?: string[];
         previousLearnings?: string[];
+        artifacts?: string[];
     }): string;
     static getSystemPrompt(type: AgentType): string;
 }

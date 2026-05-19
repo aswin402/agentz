@@ -1,5 +1,7 @@
 import { EventEmitter } from "events";
 import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import { randomUUID } from "crypto";
 import type {
   AgentType,
   ModelConfig,
@@ -39,6 +41,8 @@ export class PrimaryController extends EventEmitter {
   private primaryModel: string;
   private request: string = "";
   private loadedSkills: Map<string, string> = new Map();
+  // FIFO queue for tasks that couldn't spawn due to concurrency limits
+  private taskQueue: Array<{ task: Task; intent: AgentType[] }> = [];
 
   constructor(projectRoot: string = process.cwd()) {
     super();
@@ -238,25 +242,60 @@ export class PrimaryController extends EventEmitter {
     const promises: Promise<void>[] = [];
 
     for (const task of tasks) {
-      // Check if we can spawn more agents
-      const model = this.modelRouter.getNextModel(
-        this.determineAgentForTask(task, intent),
-        0
-      );
+      const agentType = this.determineAgentForTask(task, intent);
+      const model = this.modelRouter.getNextModel(agentType, 0);
 
-      if (!model) continue;
+      if (!model) {
+        this.log("warn", `No model available for agent type: ${agentType}, queuing task "${task.name}".`);
+        this.taskQueue.push({ task, intent });
+        continue;
+      }
 
       const canSpawn = this.modelRouter.canSpawn(model.provider, model.model, parallelConfig);
 
       if (canSpawn.canSpawn) {
         promises.push(this.executeTask(task, intent));
       } else {
-        this.log("warn", `Cannot spawn agent: ${canSpawn.reason}. Queuing task.`);
-        // Could implement a queue here
+        // Queue instead of silently dropping
+        this.log("warn", `Cannot spawn agent: ${canSpawn.reason}. Queuing task "${task.name}".`);
+        this.taskQueue.push({ task, intent });
       }
     }
 
     await Promise.all(promises);
+
+    // Drain the queue now that slots have freed up
+    await this.drainTaskQueue();
+  }
+
+  /**
+   * Drain the FIFO task queue, spawning queued tasks as concurrency allows.
+   */
+  private async drainTaskQueue(): Promise<void> {
+    const parallelConfig = this.configManager.getParallelConfig();
+
+    while (this.taskQueue.length > 0) {
+      const entry = this.taskQueue[0]!;
+      const { task, intent } = entry;
+      const agentType = this.determineAgentForTask(task, intent);
+      const model = this.modelRouter.getNextModel(agentType, 0);
+
+      if (!model) {
+        this.log("error", `No model for agent type "${agentType}", skipping queued task "${task.name}".`);
+        this.taskQueue.shift();
+        continue;
+      }
+
+      const canSpawn = this.modelRouter.canSpawn(model.provider, model.model, parallelConfig);
+      if (!canSpawn.canSpawn) {
+        // Still blocked — stop draining for now, will retry in next wave
+        this.log("info", `Queue blocked: ${canSpawn.reason}. Remaining: ${this.taskQueue.length} task(s).`);
+        break;
+      }
+
+      this.taskQueue.shift();
+      await this.executeTask(task, intent);
+    }
   }
 
   // ============================================================================
@@ -270,6 +309,8 @@ export class PrimaryController extends EventEmitter {
     let attemptIndex = 0;
     let lastError: string = "";
     const maxAttempts = this.configManager.getVerificationConfig().maxAttempts;
+    // Per-agent wall-clock timeout from the agent spec
+    const timeoutSeconds = this.modelRouter.getTimeout(subagent.type);
 
     while (attemptIndex < maxAttempts) {
       const model = this.modelRouter.getNextModel(subagent.type, attemptIndex);
@@ -303,8 +344,19 @@ export class PrimaryController extends EventEmitter {
           model,
         });
 
-        // Execute subagent
-        const result = await this.executeSubagent(subagent, task);
+        // Enforce wall-clock timeout via Promise.race — if agent stalls, the
+        // timeout rejects and the catch block triggers the fallback chain.
+        const timeoutPromise = new Promise<SubagentResult>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`timeout after ${timeoutSeconds}s`)),
+            timeoutSeconds * 1000
+          )
+        );
+
+        const result = await Promise.race([
+          this.executeSubagent(subagent, task),
+          timeoutPromise,
+        ]);
 
         this.modelRouter.recordRequestEnd(model.provider, model.model);
 
@@ -321,6 +373,7 @@ export class PrimaryController extends EventEmitter {
       } catch (error) {
         lastError = error instanceof Error ? error.message : "Unknown error";
         this.modelRouter.recordRequestEnd(model.provider, model.model);
+        this.log("warn", `Attempt ${attemptIndex + 1} error: ${lastError}`);
       }
 
       // Check if we should fallback
@@ -364,6 +417,7 @@ export class PrimaryController extends EventEmitter {
       sharedMemory: sharedMemorySummary || undefined,
       previousLearnings: previousLearnings.length > 0 ? previousLearnings : undefined,
       skills: relevantSkillNames.length > 0 ? skills : undefined,
+      artifacts: task.artifacts,
     });
 
     // Write the dispatch record to shared memory so the primary agent
@@ -499,7 +553,7 @@ export class PrimaryController extends EventEmitter {
   // ============================================================================
 
   private createSubagent(task: Task, type: AgentType, model: ModelConfig): SubagentInstance {
-    const id = `${type}-${uuidv4()}`;
+    const id = `${type}-${randomUUID()}`;
     const instance: SubagentInstance = {
       id,
       type,
@@ -544,23 +598,42 @@ export class PrimaryController extends EventEmitter {
   }
 
   private groupTasksForParallelism(tasks: Task[]): Task[][] {
-    // Simple grouping - tasks with no dependencies can run in parallel
+    // Kahn's topological sort — emits parallel waves of tasks whose deps are met.
+    // Never drops tasks; cycles fall back to sequential execution with a warning.
+    const completed = new Set<string>();
+    const remaining = new Map<string, Task>(tasks.map((t) => [t.id, t]));
     const groups: Task[][] = [];
-    const assigned = new Set<string>();
 
-    for (const task of tasks) {
-      if (assigned.has(task.id)) continue;
+    let safetyLimit = tasks.length + 1; // prevent infinite loop on unresolvable cycles
 
-      // Find all tasks that can run in parallel (no dependencies on each other)
-      const parallelGroup = tasks.filter(
-        (t) =>
-          !assigned.has(t.id) &&
-          t.dependencies.every((d) => assigned.has(d))
-      );
+    while (remaining.size > 0 && safetyLimit-- > 0) {
+      // Collect all tasks whose dependencies are already satisfied
+      const ready: Task[] = [];
+      for (const task of remaining.values()) {
+        const depsOk = task.dependencies.every((dep) => completed.has(dep));
+        if (depsOk) {
+          ready.push(task);
+        }
+      }
 
-      if (parallelGroup.length > 0) {
-        parallelGroup.forEach((t) => assigned.add(t.id));
-        groups.push(parallelGroup);
+      if (ready.length === 0) {
+        // Circular dependency detected — emit remaining tasks one-by-one to unblock
+        this.log(
+          "warn",
+          `Circular dependency detected among ${remaining.size} task(s). ` +
+          `Forcing sequential execution to prevent deadlock.`
+        );
+        for (const task of remaining.values()) {
+          groups.push([task]);
+        }
+        break;
+      }
+
+      // Emit this set as a parallel group, then mark them complete for the next wave
+      groups.push(ready);
+      for (const task of ready) {
+        completed.add(task.id);
+        remaining.delete(task.id);
       }
     }
 
@@ -659,20 +732,5 @@ export class PrimaryController extends EventEmitter {
     };
   }
 }
-
-// ============================================================================
-// Utilities
-// ============================================================================
-
-function uuidv4(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-// Import join for boulder path
-import { join } from "path";
 
 export default PrimaryController;
