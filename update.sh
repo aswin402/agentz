@@ -8,9 +8,10 @@ set -e
 # Run from the repo root: ./update.sh
 #
 # Subcommands:
-#   ./update.sh          — full update (deps + build + sync)
+#   ./update.sh          — full update (deps + build + sync) [skips if clean]
 #   ./update.sh sync     — sync configs only, no build
 #   ./update.sh diff     — show what would change in agentz-config.json, no write
+#   ./update.sh force    — force full rebuild even if up-to-date
 # =============================================================================
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,8 +21,49 @@ AGENTZ_RUNTIME_DIR="$CURRENT_DIR/.agentz"
 SOURCE_CONFIG="$AGENTZ_RUNTIME_DIR/config/config.json"
 DEST_CONFIG="$OPENCODE_CONFIG_DIR/agentz-config.json"
 
+# Build memory limit — prevent OOM on constrained systems
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+
+# =============================================================================
+# Helper: check if build is needed
+# =============================================================================
+needs_build() {
+    # Need build if dist/ doesn't exist
+    if [ ! -f "$CURRENT_DIR/dist/cli/index.js" ]; then
+        return 0
+    fi
+
+    # Need build if any source file is newer than dist
+    if [ -f "$CURRENT_DIR/.agentz/.build_marker" ]; then
+        local src_mtime=$(find "$CURRENT_DIR/src" -type f -name "*.ts" -newer "$CURRENT_DIR/.agentz/.build_marker" 2>/dev/null | wc -l)
+        if [ "$src_mtime" -gt 0 ]; then
+            return 0
+        fi
+    else
+        # No marker means assume stale
+        return 0
+    fi
+
+    # Need build if package.json or package-lock.json changed
+    if [ -f "$CURRENT_DIR/package-lock.json" ]; then
+        if [ "$CURRENT_DIR/package-lock.json" -nt "$CURRENT_DIR/dist/cli/index.js" ]; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# =============================================================================
+# Helper: touch build marker after successful build
+# =============================================================================
+mark_built() {
+    mkdir -p "$CURRENT_DIR/.agentz"
+    touch "$CURRENT_DIR/.agentz/.build_marker"
+}
 
 # ─── Shared Python comparator — call as: _config_diff src dst ────────────────
 _config_diff() {
@@ -150,11 +192,11 @@ sync_only() {
 
     echo ""
     echo -e "${CYAN}🤖 Syncing agent spec files to OpenCode...${RESET}"
-    local agents=("agentz" "agentz-vision" "z-coder" "z-planner" "z-tester" "z-reviewer" "z-security" "z-docs" "z-refactor" "z-debugger")
+    local agents=("agentz" "agentz-vision" "z-coder" "z-planner" "z-tester" "z-reviewer" "z-security" "z-docs" "z-refactor" "z-debugger" "z-researcher")
     local all_ok=true
-    
+
     mkdir -p "$OPENCODE_AGENT_DIR"
-    
+
     for agent in "${agents[@]}"; do
         local spec="$AGENTZ_RUNTIME_DIR/agents/${agent}.md"
         if [ -f "$spec" ]; then
@@ -213,20 +255,34 @@ full_update() {
     echo ""
     sync_config
 
-    # Step 4: npm install
+    # Step 4: npm install + build (conditional on FORCE_MODE or needs_build)
     echo ""
-    echo -e "${CYAN}📦 Installing npm dependencies...${RESET}"
-    cd "$CURRENT_DIR"
-    npm install --silent 2>/dev/null || npm install
-    echo -e "   ${GREEN}✓${RESET} Dependencies up to date"
+    echo -e "${CYAN}▸ Checking dependencies...${RESET}"
 
-    # Step 5: Build
-    echo ""
-    echo -e "${CYAN}🔨 Rebuilding...${RESET}"
-    npm run build
-    echo -e "   ${GREEN}✓${RESET} Build complete"
+    if [ "$FORCE_MODE" = true ]; then
+        echo -e "  ${YELLOW}Force mode: full reinstall${RESET}"
+        npm install --silent --no-fund --no-audit 2>&1 | tail -3
+        echo -e "   ${GREEN}✓${RESET} Dependencies installed"
+        mark_built
 
-    # Step 6: CLI alias
+        echo ""
+        echo -e "${CYAN}🔨 Rebuilding TypeScript...${RESET}"
+        npm run build
+        mark_built
+        echo -e "   ${GREEN}✓${RESET} Build complete"
+    elif needs_build; then
+        echo -e "  ${YELLOW}Source files changed — installing dependencies...${RESET}"
+        npm install --silent --no-fund --no-audit 2>&1 | tail -3
+        echo ""
+        echo -e "${CYAN}🔨 Rebuilding TypeScript...${RESET}"
+        npm run build
+        mark_built
+        echo -e "   ${GREEN}✓${RESET} Build complete"
+    else
+        echo -e "  ${GREEN}Dependencies and build up-to-date (skipping install + tsc)${RESET}"
+    fi
+
+    # Step 5: CLI alias
     echo ""
     echo -e "${CYAN}🔗 Verifying agentz CLI alias...${RESET}"
     local agentz_cli="$CURRENT_DIR/dist/cli/index.js"
@@ -241,7 +297,7 @@ full_update() {
         fi
     done
 
-    # Step 7: Sanity check
+    # Step 6: Sanity check
     echo ""
     echo -e "${CYAN}🔍 Sanity check...${RESET}"
     if [ -f "$CURRENT_DIR/dist/cli/index.js" ]; then
@@ -272,22 +328,25 @@ full_update() {
     echo -e "   Agents:  ${BOLD}$OPENCODE_AGENT_DIR/${RESET}"
     echo ""
     echo -e "🚀 Restart OpenCode if agent prompts were edited."
-    echo ""
 }
 
 # =============================================================================
 # Entry point
 # =============================================================================
+FORCE_MODE=false
+
 case "${1:-}" in
-    sync) sync_only ;;
-    diff) diff_only ;;
-    "")   full_update ;;
+    sync)  sync_only ;;
+    diff)  diff_only ;;
+    force) FORCE_MODE=true; full_update ;;
+    "")    full_update ;;
     *)
-        echo "Usage: ./update.sh [sync|diff]"
+        echo "Usage: ./update.sh [sync|diff|force]"
         echo ""
         echo "  (no args)  — full update: deps + build + config sync"
         echo "  sync       — sync agentz-config.json and verify agent files, no build"
         echo "  diff       — show what would change in agentz-config.json, no write"
+        echo "  force      — force full rebuild even if up-to-date"
         exit 1
         ;;
 esac

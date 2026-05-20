@@ -221,6 +221,11 @@
           "reason": "Primary vision - best quality+speed"
         },
         {
+          "provider": "google",
+          "model": "gemini-2.5-flash-preview-05-20",
+          "reason": "Vision alternative"
+        },
+        {
           "provider": "nvidia",
           "model": "meta/llama-3.2-11b-vision-instruct",
           "reason": "Vision fallback"
@@ -229,15 +234,36 @@
           "provider": "nvidia",
           "model": "meta/llama-3.2-90b-vision-instruct",
           "reason": "Complex image understanding"
-        },
-        {
-          "provider": "google",
-          "model": "gemini-2.5-flash-preview-05-20",
-          "reason": "Vision alternative"
         }
       ],
       "timeoutSeconds": 300,
       "fallbackTrigger": "error"
+    },
+    "researcher": {
+      "modelChain": [
+        {
+          "provider": "groq",
+          "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+          "reason": "10M context — ideal for reading long docs"
+        },
+        {
+          "provider": "groq",
+          "model": "llama-3.3-70b-versatile",
+          "reason": "Strong reading + summarization"
+        },
+        {
+          "provider": "mistral",
+          "model": "mistral-small-latest",
+          "reason": "Good web doc reader"
+        },
+        {
+          "provider": "cerebras",
+          "model": "gpt-oss-120b",
+          "reason": "Deep context fallback"
+        }
+      ],
+      "timeoutSeconds": 180,
+      "fallbackTrigger": "no_output"
     }
   },
   "parallel": {

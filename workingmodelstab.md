@@ -25,7 +25,7 @@
 | Subagent | Primary Model | Fallback 1 | Fallback 2 | Fallback 3 |
 |----------|--------------|------------|------------|------------|
 | **controller** (agentz) | `minimax-coding-plan/MiniMax-M2.7` | — | — | — |
-| **agentz-vision** | `google/gemini-2.5-flash` | `google/gemini-2.5-flash-lite-preview-06-17` | `nvidia/meta/llama-3.2-11b-vision-instruct` | `nvidia/meta/llama-3.2-90b-vision-instruct` |
+| **agentz-vision** | `nvidia/meta/llama-3.2-90b-vision-instruct` | `google/gemini-2.5-flash-lite-preview-06-17` | `nvidia/meta/llama-3.2-11b-vision-instruct` | `nvidia/meta/llama-3.2-90b-vision-instruct` |
 | **planner** | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/qwen-3-235b-a22b-instruct-2507` | `ollama-cloud/minimax-m2.7` | `opencode/qwen3.6-plus-free` |
 | **coder** | `mistral/devstral-small-2507` | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/gpt-oss-120b` | `nvidia/qwen/qwen3-coder-480b-a35b-instruct` |
 | **tester** | `groq/meta-llama/llama-4-scout-17b-16e-instruct` | `cerebras/llama3.1-8b` | `mistral/codestral-latest` | `opencode/qwen3.6-plus-free` |
