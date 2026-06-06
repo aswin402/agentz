@@ -69,9 +69,9 @@ find /home/aswin/programming -name "$FILENAME" 2>/dev/null | head -3
 ```
 > Do NOT `find /home/aswin` (scans everything, times out).
 
-**Step 3 (Fallback for Clipboard):** If the filename is just `clipboard`, `[Image 1]`, or if you can't find the file, assume it was a recently taken screenshot. Find the most recent image like this:
+**Step 3 (Fallback for Clipboard):** If the filename is just `clipboard`, `[Image 1]`, or if you can't find the file, first try to dump the clipboard image directly, then fallback to finding the most recent screenshot:
 ```bash
-ls -t /home/aswin/Pictures/Screenshots/*.png /home/aswin/Pictures/*.png /home/aswin/Downloads/*.png /home/aswin/Downloads/*.jpg /tmp/*.png 2>/dev/null | head -n 1
+(xclip -selection clipboard -target image/png -out > /tmp/agentz-clipboard.png 2>/dev/null || wl-paste -t image/png > /tmp/agentz-clipboard.png 2>/dev/null) && [ -s /tmp/agentz-clipboard.png ] && echo "/tmp/agentz-clipboard.png" || ls -t /home/aswin/Pictures/Screenshots/*.png /home/aswin/Pictures/*.png /home/aswin/Downloads/*.png /home/aswin/Downloads/*.jpg /tmp/*.png 2>/dev/null | head -n 1
 ```
 
 **Step 4:** Call the `task` tool:
