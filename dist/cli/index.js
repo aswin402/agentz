@@ -7,7 +7,7 @@ import { SpecWorkflow } from "../workflow/spec.js";
 import { SharedMemory } from "../runtime/memory.js";
 import { AGENT_SPECS } from "../agents/factory.js";
 import { ModelRouter } from "../agents/router.js";
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 const program = new Command();
 // ============================================================================
@@ -331,6 +331,74 @@ program
     }
     catch (error) {
         console.error(chalk.red("\n❌ Ultrawork failed:"), error instanceof Error ? error.message : "Unknown error");
+        process.exit(1);
+    }
+});
+// ============================================================================
+// Commands: Vision Direct Call
+// ============================================================================
+program
+    .command("vision")
+    .description("Analyze an image file using the vision model chain")
+    .argument("<path>", "Path to the image file")
+    .action(async (path) => {
+    try {
+        const resolvedPath = path.startsWith("/") ? path : join(process.cwd(), path);
+        if (!existsSync(resolvedPath)) {
+            console.error(chalk.red(`Error: Image file does not exist at ${resolvedPath}`));
+            process.exit(1);
+        }
+        // Read file and convert to base64
+        const base64Data = readFileSync(resolvedPath).toString("base64");
+        // Get MIME type
+        const ext = resolvedPath.split(".").pop()?.toLowerCase();
+        let mimeType = "image/png";
+        if (ext === "jpg" || ext === "jpeg")
+            mimeType = "image/jpeg";
+        else if (ext === "webp")
+            mimeType = "image/webp";
+        else if (ext === "gif")
+            mimeType = "image/gif";
+        // Call LLM
+        const configManager = new ConfigManager();
+        const router = new ModelRouter(configManager);
+        const { callLLM } = await import("../providers/index.js");
+        const subagentType = "vision";
+        const model = router.getNextModel(subagentType, 0);
+        if (!model) {
+            console.error(chalk.red("Error: No model configured for vision agent"));
+            process.exit(1);
+        }
+        const systemPrompt = "You are a vision-only agent. Analyze the provided image and describe its contents clearly and accurately.";
+        const messages = [
+            { role: "system", content: systemPrompt },
+            {
+                role: "user",
+                content: [
+                    { type: "text", text: "Describe the visible facts in this image. Focus on layout, text, UI elements, colors, and content." },
+                    {
+                        type: "image_url",
+                        image_url: {
+                            url: `data:${mimeType};base64,${base64Data}`,
+                        },
+                    },
+                ],
+            },
+        ];
+        console.log(chalk.blue(`Analyzing image using ${model.provider}/${model.model}...`));
+        const timeoutMs = router.getTimeout(subagentType) * 1000;
+        const result = await callLLM(model.provider, model.model, messages, timeoutMs);
+        if (result.success) {
+            console.log(result.content);
+            process.exit(0);
+        }
+        else {
+            console.error(chalk.red(`Error: ${result.error}`));
+            process.exit(1);
+        }
+    }
+    catch (error) {
+        console.error(chalk.red("Error:"), error instanceof Error ? error.message : "Unknown error");
         process.exit(1);
     }
 });

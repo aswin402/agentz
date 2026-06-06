@@ -1,6 +1,8 @@
 // ============================================================================
 // LLM Provider Client — actual fetch-based API calls to model providers
 // ============================================================================
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 export interface ProviderConfig {
   name: string;
@@ -85,7 +87,27 @@ const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
 function getApiKey(provider: string): string | null {
   const config = PROVIDER_REGISTRY[provider];
   if (!config) return null;
-  return process.env[config.apiKeyEnvVar] || null;
+
+  // 1. Check environment variable first
+  const envKey = process.env[config.apiKeyEnvVar];
+  if (envKey) return envKey;
+
+  // 2. Check local auth.json file as fallback
+  try {
+    const home = process.env.HOME || "/";
+    const authPath = join(home, ".local/share/opencode/auth.json");
+    if (existsSync(authPath)) {
+      const authData = JSON.parse(readFileSync(authPath, "utf-8"));
+      const providerData = authData[provider];
+      if (providerData && providerData.key) {
+        return providerData.key;
+      }
+    }
+  } catch {
+    // Ignore error and fall back
+  }
+
+  return null;
 }
 
 /** List providers that have API keys set */

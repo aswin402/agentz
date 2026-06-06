@@ -74,16 +74,12 @@ find /home/aswin/programming -name "$FILENAME" 2>/dev/null | head -3
 (xclip -selection clipboard -target image/png -out > /tmp/agentz-clipboard.png 2>/dev/null || wl-paste -t image/png > /tmp/agentz-clipboard.png 2>/dev/null) && [ -s /tmp/agentz-clipboard.png ] && echo "/tmp/agentz-clipboard.png" || ls -t /home/aswin/Pictures/Screenshots/*.png /home/aswin/Pictures/*.png /home/aswin/Downloads/*.png /home/aswin/Downloads/*.jpg /tmp/*.png 2>/dev/null | head -n 1
 ```
 
-**Step 4:** Call the `task` tool:
-- `agent`: `agentz-vision`
-- `load_skills`: `[]`
-- `prompt`:
-```
-IMAGE_PATH: /found/path/to/file.png
-USER_QUESTION: [the user's question about the image]
+**Step 4:** Run the **`bash` tool** to analyze the image using the local vision pipeline CLI:
+```bash
+agentz vision "/found/path/to/file.png"
 ```
 
-**Step 5:** Wait for result, then answer the user.
+**Step 5:** Use the output from the CLI command (which contains the real description of the image) to answer the user's question.
 
 > If no recent file is found at all: tell user to manually save it to `/tmp/img.png` then ask again.
 
