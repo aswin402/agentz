@@ -218,22 +218,32 @@
         {
           "provider": "google",
           "model": "gemini-2.5-flash",
-          "reason": "Primary vision - best quality+speed"
+          "reason": "Primary vision - Google AI Studio Gemini 2.5 Flash"
         },
         {
-          "provider": "google",
-          "model": "gemini-2.5-flash-preview-05-20",
-          "reason": "Vision alternative"
-        },
-        {
-          "provider": "nvidia",
-          "model": "meta/llama-3.2-11b-vision-instruct",
-          "reason": "Vision fallback"
+          "provider": "openrouter",
+          "model": "google/gemini-2.5-flash",
+          "reason": "Fallback Gemini 2.5 Flash on OpenRouter"
         },
         {
           "provider": "nvidia",
           "model": "meta/llama-3.2-90b-vision-instruct",
-          "reason": "Complex image understanding"
+          "reason": "Fallback Llama 3.2 90B Vision on NVIDIA"
+        },
+        {
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.2-90b-vision-instruct",
+          "reason": "Fallback Llama 3.2 90B Vision on OpenRouter"
+        },
+        {
+          "provider": "openrouter",
+          "model": "google/gemini-2.5-flash-lite",
+          "reason": "Fallback Gemini 2.5 Flash Lite on OpenRouter"
+        },
+        {
+          "provider": "openrouter",
+          "model": "google/gemini-3.1-flash-lite",
+          "reason": "Fallback Gemini 3.1 Flash Lite on OpenRouter"
         }
       ],
       "timeoutSeconds": 300,
@@ -267,7 +277,7 @@
     }
   },
   "parallel": {
-    "maxAgents": 5,
+    "maxAgents": 1,
     "perProvider": {
       "groq": 3,
       "cerebras": 2,
@@ -282,9 +292,9 @@
     "perModel": {}
   },
   "verification": {
-    "autoFix": true,
+    "autoFix": false,
     "maxAttempts": 3,
-    "requireTests": true
+    "requireTests": false
   },
   "skills": {
     "enable": [

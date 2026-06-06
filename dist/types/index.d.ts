@@ -16,7 +16,7 @@ export interface AgentModelChain {
     timeoutSeconds: number;
     fallbackTrigger?: "no_output" | "error" | "timeout";
 }
-export declare const AgentTypeSchema: z.ZodEnum<["planner", "coder", "tester", "reviewer", "security", "docs", "refactor", "debugger", "vision"]>;
+export declare const AgentTypeSchema: z.ZodEnum<["planner", "coder", "tester", "reviewer", "security", "docs", "refactor", "debugger", "vision", "researcher"]>;
 export type AgentType = z.infer<typeof AgentTypeSchema>;
 export interface AgentSpec {
     type: AgentType;

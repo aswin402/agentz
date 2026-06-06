@@ -106,6 +106,7 @@ export class SpecWorkflow {
     generateSpec(taskSlug, request) {
         const intent = classifyIntent(request);
         const id = `spec-${Date.now()}`;
+        const fileChanges = this.extractFileChanges(request);
         const spec = {
             id,
             objective: this.extractObjective(request),
@@ -122,16 +123,42 @@ export class SpecWorkflow {
                 },
             },
             acceptanceCriteria: this.generateAcceptanceCriteria(request),
-            fileChanges: {
-                create: [],
-                modify: [],
-                delete: [],
-            },
+            fileChanges,
             dependencies: [],
             verificationPlan: "Tests pass, lint clean, manual verification",
             createdAt: new Date(),
         };
         return spec;
+    }
+    /**
+     * Extract file changes from request by parsing backtick-quoted paths
+     */
+    extractFileChanges(request) {
+        const create = [];
+        const modify = [];
+        const delete_ = [];
+        // Match backtick-quoted paths like `src/foo.ts` or `path/to/file.tsx`
+        const pathPattern = /`([a-zA-Z0-9_\-./]+\.(ts|tsx|js|jsx|css|html|json|md|py|rs|go))`/g;
+        let match;
+        const paths = new Set();
+        while ((match = pathPattern.exec(request)) !== null) {
+            paths.add(match[1]);
+        }
+        // Categorize by context keywords in the line
+        for (const path of paths) {
+            const line = request.split("\n").find((l) => l.includes(`\`${path}\``));
+            const ctx = line?.toLowerCase() || "";
+            if (ctx.includes("delete") || ctx.includes("remove")) {
+                delete_.push(path);
+            }
+            else if (ctx.includes("create") || ctx.includes("new file") || line?.includes("create") || !existsSync(join(this.projectRoot, path))) {
+                create.push(path);
+            }
+            else {
+                modify.push(path);
+            }
+        }
+        return { create, modify, delete: delete_ };
     }
     /**
      * Save a spec to file
@@ -439,7 +466,6 @@ ${criteria.map((c, i) => `- [ ] ${i + 1}. ${c}`).join("\n")}
     }
     generateTasks(spec) {
         const tasks = [];
-        // Create task for each file to create
         for (const file of spec.fileChanges.create) {
             tasks.push({
                 id: `task-${tasks.length + 1}`,
@@ -453,7 +479,6 @@ ${criteria.map((c, i) => `- [ ] ${i + 1}. ${c}`).join("\n")}
                 ],
             });
         }
-        // Create task for each file to modify
         for (const file of spec.fileChanges.modify) {
             tasks.push({
                 id: `task-${tasks.length + 1}`,
@@ -464,6 +489,20 @@ ${criteria.map((c, i) => `- [ ] ${i + 1}. ${c}`).join("\n")}
                 artifacts: [file],
                 verificationCriteria: [
                     { id: "vc-1", description: "Changes applied", type: "manual", status: "pending" },
+                ],
+            });
+        }
+        // Fallback: always generate at least one task from the objective
+        if (tasks.length === 0) {
+            tasks.push({
+                id: "task-1",
+                name: spec.objective.length > 60 ? spec.objective.slice(0, 57) + "..." : spec.objective,
+                description: spec.objective,
+                status: "pending",
+                dependencies: [],
+                artifacts: [],
+                verificationCriteria: [
+                    { id: "vc-1", description: "Objective met", type: "manual", status: "pending" },
                 ],
             });
         }

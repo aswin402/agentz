@@ -1,6 +1,5 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync, copyFileSync, } from "fs";
 import { join, dirname } from "path";
-import { execSync } from "child_process";
 // ============================================================================
 // Shared Memory System
 // ============================================================================
@@ -157,7 +156,7 @@ export class SharedMemory {
     clearBoulder() {
         const boulderPath = join(this.basePath, "boulder.json");
         if (existsSync(boulderPath)) {
-            execSync(`rm "${boulderPath}"`);
+            rmSync(boulderPath);
         }
     }
     createDefaultBoulder() {
@@ -266,7 +265,7 @@ export class SharedMemory {
     clearSubagentStatus(agentId) {
         const statusPath = join(this.basePath, "active/subagent-status", `${agentId}.json`);
         if (existsSync(statusPath)) {
-            execSync(`rm "${statusPath}"`);
+            rmSync(statusPath);
         }
     }
     // ============================================================================
@@ -274,7 +273,7 @@ export class SharedMemory {
     // ============================================================================
     formatEntry(entry) {
         const lines = [
-            `## ${entry.agentType} @ ${entry.timestamp.toISOString()}`,
+            `## ${entry.agentType} [${entry.agentId}] @ ${entry.timestamp.toISOString()}`,
             "",
             "### Status",
             `[${entry.status.toUpperCase()}]`,
@@ -339,13 +338,13 @@ export class SharedMemory {
         const lines = section.split("\n");
         if (lines.length < 2)
             return null;
-        // Parse header: "AgentType @ ISO timestamp"
-        const headerMatch = lines[0].match(/^(.+?) @ (.+)$/);
+        // Parse header: "AgentType [agentId] @ ISO timestamp"
+        const headerMatch = lines[0].match(/^(.+?) \[(.+?)\] @ (.+)$/);
         if (!headerMatch)
             return null;
-        const [, agentType, timestamp] = headerMatch;
+        const [, agentType, agentId, timestamp] = headerMatch;
         const entry = {
-            agentId: agentType, // Will be overwritten with real ID
+            agentId,
             agentType: agentType,
             timestamp: new Date(timestamp),
             status: "running",
@@ -456,7 +455,7 @@ export class SharedMemory {
         if (existsSync(statusDir)) {
             const files = readdirSync(statusDir);
             for (const file of files) {
-                execSync(`rm "${join(statusDir, file)}"`);
+                rmSync(join(statusDir, file));
             }
         }
     }
@@ -470,17 +469,17 @@ export class SharedMemory {
         // Archive shared memory
         const memoryPath = join(this.basePath, "active/shared-memory.md");
         if (existsSync(memoryPath)) {
-            execSync(`cp "${memoryPath}" "${join(archiveDir, "shared-memory.md")}"`);
+            copyFileSync(memoryPath, join(archiveDir, "shared-memory.md"));
         }
         // Archive decision log
         const decisionPath = join(this.basePath, "active/decision-log.md");
         if (existsSync(decisionPath)) {
-            execSync(`cp "${decisionPath}" "${join(archiveDir, "decision-log.md")}"`);
+            copyFileSync(decisionPath, join(archiveDir, "decision-log.md"));
         }
         // Archive boulder if exists
         const boulderPath = join(this.basePath, "boulder.json");
         if (existsSync(boulderPath)) {
-            execSync(`cp "${boulderPath}" "${join(archiveDir, "boulder.json")}"`);
+            copyFileSync(boulderPath, join(archiveDir, "boulder.json"));
         }
     }
 }

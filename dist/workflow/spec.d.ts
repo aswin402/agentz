@@ -32,6 +32,10 @@ export declare class SpecWorkflow {
      */
     generateSpec(taskSlug: string, request: string): Spec;
     /**
+     * Extract file changes from request by parsing backtick-quoted paths
+     */
+    private extractFileChanges;
+    /**
      * Save a spec to file
      */
     saveSpec(taskSlug: string, spec: Spec): void;

@@ -17,7 +17,7 @@ declare const _default: {
     SharedMemory: typeof SharedMemory;
     SpecWorkflow: typeof SpecWorkflow;
     VerificationPipeline: typeof VerificationPipeline;
-    AGENT_SPECS: Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision", import("./types/index.js").AgentSpec>;
+    AGENT_SPECS: Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision" | "researcher", import("./types/index.js").AgentSpec>;
     classifyIntent: typeof classifyIntent;
     generateConfigTemplate: typeof generateConfigTemplate;
 };

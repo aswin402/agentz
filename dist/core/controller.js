@@ -8,6 +8,7 @@ import { AgentFactory, classifyIntent } from "../agents/factory.js";
 import { SharedMemory } from "../runtime/memory.js";
 import { SpecWorkflow } from "../workflow/spec.js";
 import { VerificationPipeline } from "../verification/pipeline.js";
+import { callLLM } from "../providers/index.js";
 // ============================================================================
 // Primary Controller Orchestrator
 // ============================================================================
@@ -67,7 +68,8 @@ export class PrimaryController extends EventEmitter {
             docs: ["git-master"],
             refactor: ["git-master"],
             debugger: ["git-master"],
-            vision: ["frontend-ui-ux"],
+            vision: [],
+            researcher: [],
         };
         return (skillMapping[agentType] || []).filter((s) => this.loadedSkills.has(s));
     }
@@ -240,7 +242,6 @@ export class PrimaryController extends EventEmitter {
         let attemptIndex = 0;
         let lastError = "";
         const maxAttempts = this.configManager.getVerificationConfig().maxAttempts;
-        // Per-agent wall-clock timeout from the agent spec
         const timeoutSeconds = this.modelRouter.getTimeout(subagent.type);
         while (attemptIndex < maxAttempts) {
             const model = this.modelRouter.getNextModel(subagent.type, attemptIndex);
@@ -251,26 +252,18 @@ export class PrimaryController extends EventEmitter {
                 };
             }
             try {
-                // Update subagent with current model
                 subagent.model = model;
                 subagent.status = "running";
                 this.modelRouter.recordRequestStart(model.provider, model.model);
-                // Update shared memory
                 this.sharedMemory.updateSubagentStatus(subagent.id, subagent.type, "running", `Attempt ${attemptIndex + 1} using ${model.provider}/${model.model}`);
-                // Log decision
                 this.logDecision({
                     action: "spawn",
                     reason: `Attempt ${attemptIndex + 1} for task "${task.name}" using ${model.provider}/${model.model}`,
                     agentId: subagent.id,
                     model,
                 });
-                // Enforce wall-clock timeout via Promise.race — if agent stalls, the
-                // timeout rejects and the catch block triggers the fallback chain.
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout after ${timeoutSeconds}s`)), timeoutSeconds * 1000));
-                const result = await Promise.race([
-                    this.executeSubagent(subagent, task),
-                    timeoutPromise,
-                ]);
+                // Timeout handled internally by callLLM via AbortController
+                const result = await this.executeSubagent(subagent, task);
                 this.modelRouter.recordRequestEnd(model.provider, model.model);
                 if (result.success) {
                     subagent.status = "completed";
@@ -286,7 +279,6 @@ export class PrimaryController extends EventEmitter {
                 this.modelRouter.recordRequestEnd(model.provider, model.model);
                 this.log("warn", `Attempt ${attemptIndex + 1} error: ${lastError}`);
             }
-            // Check if we should fallback
             const fallback = this.modelRouter.shouldFallback(subagent.type, attemptIndex, lastError);
             if (fallback.shouldFallback) {
                 attemptIndex = fallback.nextIndex;
@@ -315,15 +307,14 @@ export class PrimaryController extends EventEmitter {
         const previousLearnings = this.sharedMemory.getLearnings();
         const relevantSkillNames = this.getSkillsForAgent(subagent.type);
         const skills = relevantSkillNames.map((name) => this.loadedSkills.get(name) || "").filter(Boolean);
-        const prompt = AgentFactory.createSubagentPrompt(subagent.type, {
+        const systemPrompt = AgentFactory.getSystemPrompt(subagent.type);
+        const userPrompt = AgentFactory.createSubagentPrompt(subagent.type, {
             task: task.description,
             sharedMemory: sharedMemorySummary || undefined,
             previousLearnings: previousLearnings.length > 0 ? previousLearnings : undefined,
             skills: relevantSkillNames.length > 0 ? skills : undefined,
             artifacts: task.artifacts,
         });
-        // Write the dispatch record to shared memory so the primary agent
-        // and OpenCode task tool can track this agent's work.
         this.sharedMemory.writeEntry({
             agentId: subagent.id,
             agentType: subagent.type,
@@ -334,18 +325,76 @@ export class PrimaryController extends EventEmitter {
             nextSteps: [],
             artifacts: task.artifacts,
         });
-        // Return the structured prompt so the primary agent (running in OpenCode)
-        // can dispatch via its `task` tool with the correct model and prompt.
-        // The primary agent's system prompt instructs it to use the task tool;
-        // this method provides the fully-formed prompt for that dispatch.
+        // ─── Multimodal Handling for Vision Agent ───────────────────────
+        let userContent = userPrompt;
+        if (subagent.type === "vision") {
+            const imagePaths = new Set();
+            // Check task artifacts
+            if (task.artifacts) {
+                for (const art of task.artifacts) {
+                    if (/\.(png|jpe?g|webp|gif)$/i.test(art)) {
+                        const resolvedPath = art.startsWith("/") ? art : join(process.cwd(), art);
+                        if (existsSync(resolvedPath)) {
+                            imagePaths.add(resolvedPath);
+                        }
+                    }
+                }
+            }
+            // Check task description for IMAGE_PATH protocol
+            const imgPathRegex = /IMAGE_PATH:\s*([^\s\n]+)/gi;
+            let match;
+            while ((match = imgPathRegex.exec(task.description)) !== null) {
+                const pathCandidate = match[1];
+                const resolvedPath = pathCandidate.startsWith("/") ? pathCandidate : join(process.cwd(), pathCandidate);
+                if (existsSync(resolvedPath)) {
+                    imagePaths.add(resolvedPath);
+                }
+            }
+            if (imagePaths.size > 0) {
+                const parts = [{ type: "text", text: userPrompt }];
+                for (const imgPath of imagePaths) {
+                    try {
+                        const mimeType = this.getMimeType(imgPath);
+                        const base64Data = readFileSync(imgPath).toString("base64");
+                        parts.push({
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Data}`,
+                            },
+                        });
+                        this.log("info", `Attached image: ${imgPath}`);
+                    }
+                    catch (err) {
+                        this.log("warn", `Failed to read image at ${imgPath}: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                }
+                userContent = parts;
+            }
+        }
+        // ─── ACTUAL LLM CALL ────────────────────────────────────────────
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent },
+        ];
+        const timeoutMs = this.modelRouter.getTimeout(subagent.type) * 1000;
+        const result = await callLLM(subagent.model.provider, subagent.model.model, messages, timeoutMs);
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error,
+                artifacts: task.artifacts,
+                learnings: [`${subagent.model.provider}/${subagent.model.model} failed: ${result.error}`],
+            };
+        }
+        const learnings = [
+            `Completed ${subagent.type} task via ${result.provider}/${result.model} (${result.latencyMs}ms)`,
+            ...(relevantSkillNames.length > 0 ? [`Skills injected: ${relevantSkillNames.join(", ")}`] : []),
+        ];
         return {
             success: true,
-            output: prompt,
+            output: result.content,
             artifacts: task.artifacts,
-            learnings: [
-                `Dispatched ${subagent.type} agent for: ${task.name} via ${subagent.model.provider}/${subagent.model.model}`,
-                ...(relevantSkillNames.length > 0 ? [`Skills injected: ${relevantSkillNames.join(", ")}`] : []),
-            ],
+            learnings,
         };
     }
     // ============================================================================
@@ -463,6 +512,9 @@ export class PrimaryController extends EventEmitter {
         if (taskName.includes("refactor")) {
             return "refactor";
         }
+        if (taskName.includes("research") || taskName.includes("explore") || taskName.includes("investigate") || taskName.includes("lookup")) {
+            return "researcher";
+        }
         // Default based on intent
         return intent[0] || "coder";
     }
@@ -560,6 +612,22 @@ export class PrimaryController extends EventEmitter {
             return true;
         }
         return false;
+    }
+    getMimeType(filePath) {
+        const ext = filePath.split(".").pop()?.toLowerCase();
+        switch (ext) {
+            case "png":
+                return "image/png";
+            case "jpg":
+            case "jpeg":
+                return "image/jpeg";
+            case "webp":
+                return "image/webp";
+            case "gif":
+                return "image/gif";
+            default:
+                return "application/octet-stream";
+        }
     }
     getStatus() {
         return {

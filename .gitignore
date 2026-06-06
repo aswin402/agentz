@@ -1,4 +1,9 @@
 .crush/*
 .node/*
 .logs/*
-
+node_modules/
+dist/
+logs/
+.omo/
+.sisyphus/
+.zed/

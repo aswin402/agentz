@@ -63,6 +63,7 @@ export const AgentZConfigSchema = z.object({
         "refactor",
         "debugger",
         "vision",
+        "researcher",
       ]),
       AgentModelChainSchema
     )
@@ -160,13 +161,25 @@ export const DEFAULT_MODEL_CHAINS: Record<AgentType, z.infer<typeof AgentModelCh
   },
   vision: {
     modelChain: [
-      { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - best quality+speed" },
-      { provider: "nvidia", model: "meta/llama-3.2-11b-vision-instruct", reason: "Vision fallback" },
-      { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Complex image understanding" },
-      { provider: "google", model: "gemini-2.5-flash-preview-05-20", reason: "Vision alternative" },
+      { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - Google AI Studio Gemini 2.5 Flash" },
+      { provider: "openrouter", model: "google/gemini-2.5-flash", reason: "Fallback Gemini 2.5 Flash on OpenRouter" },
+      { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on NVIDIA" },
+      { provider: "openrouter", model: "meta-llama/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on OpenRouter" },
+      { provider: "openrouter", model: "google/gemini-2.5-flash-lite", reason: "Fallback Gemini 2.5 Flash Lite on OpenRouter" },
+      { provider: "openrouter", model: "google/gemini-3.1-flash-lite", reason: "Fallback Gemini 3.1 Flash Lite on OpenRouter" },
     ],
     timeoutSeconds: 60,
     fallbackTrigger: "error",
+  },
+  researcher: {
+    modelChain: [
+      { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "10M context — ideal for reading long docs" },
+      { provider: "groq", model: "llama-3.3-70b-versatile", reason: "Strong reading + summarization" },
+      { provider: "mistral", model: "mistral-small-latest", reason: "Good web doc reader" },
+      { provider: "cerebras", model: "gpt-oss-120b", reason: "Deep context fallback" },
+    ],
+    timeoutSeconds: 180,
+    fallbackTrigger: "no_output",
   },
 };
 
@@ -185,6 +198,7 @@ const DEFAULT_CONFIG: AgentZConfig = {
     refactor: DEFAULT_MODEL_CHAINS.refactor,
     debugger: DEFAULT_MODEL_CHAINS.debugger,
     vision: DEFAULT_MODEL_CHAINS.vision,
+    researcher: DEFAULT_MODEL_CHAINS.researcher,
   },
   parallel: {
     maxAgents: 5,

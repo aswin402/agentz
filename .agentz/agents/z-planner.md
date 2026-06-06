@@ -9,7 +9,8 @@ permission:
   bash: allow
   read: allow
   glob: allow
-  grep: allow
+  grep: allow    "git log*": allow
+
   webfetch: allow
   task: deny
   todowrite: deny

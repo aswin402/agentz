@@ -59,7 +59,7 @@ export declare const AgentZConfigSchema: z.ZodObject<{
         model: string;
         role: "controller";
     }>;
-    agents: z.ZodDefault<z.ZodRecord<z.ZodEnum<["planner", "coder", "tester", "reviewer", "security", "docs", "refactor", "debugger", "vision"]>, z.ZodObject<{
+    agents: z.ZodDefault<z.ZodRecord<z.ZodEnum<["planner", "coder", "tester", "reviewer", "security", "docs", "refactor", "debugger", "vision", "researcher"]>, z.ZodObject<{
         modelChain: z.ZodArray<z.ZodObject<{
             provider: z.ZodString;
             model: z.ZodString;
@@ -158,7 +158,7 @@ export declare const AgentZConfigSchema: z.ZodObject<{
         model: string;
         role: "controller";
     };
-    agents: Partial<Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision", {
+    agents: Partial<Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision" | "researcher", {
         modelChain: {
             provider: string;
             model: string;
@@ -193,7 +193,7 @@ export declare const AgentZConfigSchema: z.ZodObject<{
         model: string;
         role: "controller";
     };
-    agents?: Partial<Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision", {
+    agents?: Partial<Record<"refactor" | "docs" | "planner" | "coder" | "tester" | "reviewer" | "security" | "debugger" | "vision" | "researcher", {
         modelChain: {
             provider: string;
             model: string;

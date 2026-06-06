@@ -48,6 +48,7 @@ export declare class PrimaryController extends EventEmitter {
     getCurrentTaskSlug(): string | null;
     getCurrentPlan(): Plan | null;
     killSubagent(agentId: string): boolean;
+    private getMimeType;
     getStatus(): {
         activeTask: string | null;
         activeSubagents: number;

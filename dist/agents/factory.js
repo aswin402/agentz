@@ -111,13 +111,28 @@ export const AGENT_SPECS = {
         name: "Vision",
         description: "Vision agent that analyzes images, screenshots, and UI designs to provide context",
         modelChain: [
-            { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - best quality+speed" },
-            { provider: "nvidia", model: "meta/llama-3.2-11b-vision-instruct", reason: "Vision fallback" },
-            { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Complex image understanding" },
-            { provider: "google", model: "gemini-2.5-flash-preview-05-20", reason: "Vision alternative" },
+            { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - Google AI Studio Gemini 2.5 Flash" },
+            { provider: "openrouter", model: "google/gemini-2.5-flash", reason: "Fallback Gemini 2.5 Flash on OpenRouter" },
+            { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on NVIDIA" },
+            { provider: "openrouter", model: "meta-llama/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on OpenRouter" },
+            { provider: "openrouter", model: "google/gemini-2.5-flash-lite", reason: "Fallback Gemini 2.5 Flash Lite on OpenRouter" },
+            { provider: "openrouter", model: "google/gemini-3.1-flash-lite", reason: "Fallback Gemini 3.1 Flash Lite on OpenRouter" },
         ],
         timeoutSeconds: 60,
         capabilities: ["image_analysis", "code_read", "web_fetch"],
+    },
+    researcher: {
+        type: "researcher",
+        name: "Researcher",
+        description: "Technical research agent that fetches documentation, reads files, and gathers API references",
+        modelChain: [
+            { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "10M context — ideal for reading long docs" },
+            { provider: "groq", model: "llama-3.3-70b-versatile", reason: "Strong reading + summarization" },
+            { provider: "mistral", model: "mistral-small-latest", reason: "Good web doc reader" },
+            { provider: "cerebras", model: "gpt-oss-120b", reason: "Deep context fallback" },
+        ],
+        timeoutSeconds: 180,
+        capabilities: ["code_read", "web_search", "web_fetch"],
     },
 };
 // ============================================================================
@@ -238,66 +253,42 @@ Do not plan beyond your immediate task - let the controller handle orchestration
 // ============================================================================
 export function classifyIntent(userRequest, hasImages = false) {
     const request = userRequest.toLowerCase();
-    const agents = [];
+    const agents = new Set();
     // Image attached → always include vision
     if (hasImages) {
-        agents.push("vision");
+        agents.add("vision");
     }
-    // Intent classification
-    if (request.includes("fix") ||
-        request.includes("bug") ||
-        request.includes("error") ||
-        request.includes("broken") ||
-        request.includes("crash")) {
-        agents.push("debugger");
-        if (request.includes("test"))
-            agents.push("tester");
-        return agents;
+    // Aggregate all matching intents (no early returns)
+    const debugMatch = /fix|bug|error|broken|crash/i.test(request);
+    const codeMatch = /implement|create|add|build|new|make|write/i.test(request);
+    const refactorMatch = /refactor|improve|clean|restructure|reorganize/i.test(request);
+    const reviewMatch = /review|check|evaluate|critique|audit/i.test(request);
+    const docsMatch = /document|readme|comment|docs/i.test(request);
+    const securityMatch = /security|vulnerability|auth|unsafe|injection/i.test(request);
+    const testMatch = /test|spec|coverage|assert/i.test(request);
+    const researchMatch = /research|investigate|explore|find|lookup|fetch/i.test(request);
+    if (debugMatch)
+        agents.add("debugger");
+    if (codeMatch)
+        agents.add("coder");
+    if (refactorMatch)
+        agents.add("refactor");
+    if (reviewMatch)
+        agents.add("reviewer");
+    if (docsMatch)
+        agents.add("docs");
+    if (securityMatch)
+        agents.add("security");
+    if (testMatch)
+        agents.add("tester");
+    if (researchMatch)
+        agents.add("researcher");
+    // Default: no intents matched → research/planning mode
+    if (agents.size === 0) {
+        agents.add("planner");
+        agents.add("coder");
     }
-    if (request.includes("implement") ||
-        request.includes("create") ||
-        request.includes("add") ||
-        request.includes("build") ||
-        request.includes("new")) {
-        agents.push("coder");
-        if (request.includes("test"))
-            agents.push("tester");
-        if (request.includes("document"))
-            agents.push("docs");
-        return agents;
-    }
-    if (request.includes("refactor") ||
-        request.includes("improve") ||
-        request.includes("clean") ||
-        request.includes("restructure")) {
-        agents.push("refactor");
-        return agents;
-    }
-    if (request.includes("review") ||
-        request.includes("check") ||
-        request.includes("evaluate") ||
-        request.includes("critique")) {
-        agents.push("reviewer");
-        return agents;
-    }
-    if (request.includes("document") ||
-        request.includes("readme") ||
-        request.includes("comment") ||
-        request.includes("docs")) {
-        agents.push("docs");
-        return agents;
-    }
-    if (request.includes("security") ||
-        request.includes("vulnerability") ||
-        request.includes("auth") ||
-        request.includes("unsafe")) {
-        agents.push("security");
-        return agents;
-    }
-    // Default: research/planning mode
-    agents.push("planner");
-    agents.push("coder");
-    return agents;
+    return Array.from(agents);
 }
 export const FREE_PROVIDERS = {
     groq: {

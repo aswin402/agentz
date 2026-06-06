@@ -1,6 +1,8 @@
-import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { exec } from "child_process";
+import { promisify } from "util";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+const execAsync = promisify(exec);
 // ============================================================================
 // Verification Pipeline
 // ============================================================================
@@ -20,6 +22,7 @@ export class VerificationPipeline {
             this.checkLint(task.artifacts),
             this.checkTests(task.artifacts),
             this.checkSecurity(task.artifacts),
+            this.checkBehavior((task.verificationCriteria || []).map((c) => c.description)),
         ]);
         const allCriteria = checks.flat();
         for (const criterion of allCriteria) {
@@ -52,32 +55,27 @@ export class VerificationPipeline {
                 switch (ext) {
                     case "ts":
                     case "tsx":
-                        // TypeScript syntax check
-                        execSync(`npx tsc --noEmit --skipLibCheck "${fullPath}" 2>&1`, {
+                        await execAsync(`npx tsc --noEmit --skipLibCheck "${fullPath}"`, {
                             cwd: this.projectRoot,
-                            stdio: "pipe",
                         });
                         criterion.status = "passed";
                         break;
                     case "js":
                     case "jsx":
-                        execSync(`node --check "${fullPath}" 2>&1`, {
+                        await execAsync(`node --check "${fullPath}"`, {
                             cwd: this.projectRoot,
-                            stdio: "pipe",
                         });
                         criterion.status = "passed";
                         break;
                     case "py":
-                        execSync(`python -m py_compile "${fullPath}" 2>&1`, {
+                        await execAsync(`python -m py_compile "${fullPath}"`, {
                             cwd: this.projectRoot,
-                            stdio: "pipe",
                         });
                         criterion.status = "passed";
                         break;
                     case "rs":
-                        execSync(`rustc --edition 2021 --emit=metadata -o /dev/null "${fullPath}" 2>&1`, {
+                        await execAsync(`rustc --edition 2021 --emit=metadata -o /dev/null "${fullPath}"`, {
                             cwd: this.projectRoot,
-                            stdio: "pipe",
                         });
                         criterion.status = "passed";
                         break;
@@ -117,30 +115,48 @@ export class VerificationPipeline {
         const tsFiles = files.filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"));
         try {
             if (hasEslint && tsFiles.length > 0) {
-                const result = execSync(`npx eslint ${tsFiles.join(" ")} 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                if (result.toString().includes("0 problems")) {
-                    criterion.status = "passed";
+                try {
+                    const { stdout } = await execAsync(`npx eslint ${tsFiles.join(" ")}`, {
+                        cwd: this.projectRoot,
+                    });
+                    if (stdout.includes("0 problems")) {
+                        criterion.status = "passed";
+                    }
+                    else {
+                        criterion.status = "failed";
+                        criterion.details = stdout.substring(0, 500);
+                    }
                 }
-                else {
+                catch (e) {
                     criterion.status = "failed";
-                    criterion.details = result.toString();
+                    criterion.details = e instanceof Error ? e.message.substring(0, 500) : "ESLint failed";
                 }
             }
             else if (hasPrettier && tsFiles.length > 0) {
-                const unformatted = execSync(`npx prettier --check ${tsFiles.join(" ")} 2>&1`, { cwd: this.projectRoot, stdio: "pipe" });
-                criterion.status = "passed";
+                try {
+                    await execAsync(`npx prettier --check ${tsFiles.join(" ")}`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = "passed";
+                }
+                catch {
+                    criterion.status = "failed";
+                    criterion.details = "Prettier formatting issues detected";
+                }
             }
             else if (hasRubocop) {
                 const rubyFiles = files.filter((f) => f.endsWith(".rb"));
                 if (rubyFiles.length > 0) {
-                    const result = execSync(`bundle exec rubocop ${rubyFiles.join(" ")} 2>&1`, {
-                        cwd: this.projectRoot,
-                        stdio: "pipe",
-                    });
-                    criterion.status = "passed";
+                    try {
+                        await execAsync(`bundle exec rubocop ${rubyFiles.join(" ")}`, {
+                            cwd: this.projectRoot,
+                        });
+                        criterion.status = "passed";
+                    }
+                    catch (e) {
+                        criterion.status = "failed";
+                        criterion.details = e instanceof Error ? e.message.substring(0, 500) : "RuboCop failed";
+                    }
                 }
                 else {
                     criterion.status = "skipped";
@@ -149,11 +165,16 @@ export class VerificationPipeline {
             else if (hasRustfmt) {
                 const rustFiles = files.filter((f) => f.endsWith(".rs"));
                 if (rustFiles.length > 0) {
-                    execSync(`rustfmt --check ${rustFiles.join(" ")} 2>&1`, {
-                        cwd: this.projectRoot,
-                        stdio: "pipe",
-                    });
-                    criterion.status = "passed";
+                    try {
+                        await execAsync(`rustfmt --check ${rustFiles.join(" ")}`, {
+                            cwd: this.projectRoot,
+                        });
+                        criterion.status = "passed";
+                    }
+                    catch {
+                        criterion.status = "failed";
+                        criterion.details = "rustfmt formatting issues detected";
+                    }
                 }
                 else {
                     criterion.status = "skipped";
@@ -191,36 +212,56 @@ export class VerificationPipeline {
         const hasRustTests = files.some((f) => f.endsWith(".rs"));
         try {
             if (hasVitest) {
-                const result = execSync(`npx vitest run --reporter=verbose 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                criterion.status = result.toString().includes("passed") ? "passed" : "failed";
-                criterion.details = result.toString().substring(0, 500);
+                try {
+                    const { stdout } = await execAsync(`npx vitest run --reporter=verbose`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = stdout.includes("passed") ? "passed" : "failed";
+                    criterion.details = stdout.substring(0, 500);
+                }
+                catch (e) {
+                    criterion.status = "failed";
+                    criterion.details = e instanceof Error ? e.message.substring(0, 500) : "Vitest failed";
+                }
             }
             else if (hasJest) {
-                const result = execSync(`npx jest 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                criterion.status = result.toString().includes("PASS") ? "passed" : "failed";
-                criterion.details = result.toString().substring(0, 500);
+                try {
+                    const { stdout } = await execAsync(`npx jest`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = stdout.includes("PASS") ? "passed" : "failed";
+                    criterion.details = stdout.substring(0, 500);
+                }
+                catch (e) {
+                    criterion.status = "failed";
+                    criterion.details = e instanceof Error ? e.message.substring(0, 500) : "Jest failed";
+                }
             }
             else if (hasPytest) {
-                const result = execSync(`python -m pytest 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                criterion.status = result.toString().includes("passed") ? "passed" : "failed";
-                criterion.details = result.toString().substring(0, 500);
+                try {
+                    const { stdout } = await execAsync(`python -m pytest`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = stdout.includes("passed") ? "passed" : "failed";
+                    criterion.details = stdout.substring(0, 500);
+                }
+                catch (e) {
+                    criterion.status = "failed";
+                    criterion.details = e instanceof Error ? e.message.substring(0, 500) : "pytest failed";
+                }
             }
             else if (hasRustTests) {
-                const result = execSync(`cargo test 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                criterion.status = result.toString().includes("test result: ok") ? "passed" : "failed";
-                criterion.details = result.toString().substring(0, 500);
+                try {
+                    const { stdout } = await execAsync(`cargo test`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = stdout.includes("test result: ok") ? "passed" : "failed";
+                    criterion.details = stdout.substring(0, 500);
+                }
+                catch (e) {
+                    criterion.status = "failed";
+                    criterion.details = e instanceof Error ? e.message.substring(0, 500) : "Cargo test failed";
+                }
             }
             else {
                 criterion.status = "skipped";
@@ -251,23 +292,31 @@ export class VerificationPipeline {
             existsSync(join(this.projectRoot, "Pipfile"));
         try {
             if (hasNpmAudit) {
-                const result = execSync(`npm audit --audit-level=high 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                // npm audit returns 0 if no high/critical vulnerabilities
-                criterion.status = "passed";
-                criterion.details = "No high/critical vulnerabilities found";
+                try {
+                    await execAsync(`npm audit --audit-level=high`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = "passed";
+                    criterion.details = "No high/critical vulnerabilities found";
+                }
+                catch {
+                    criterion.status = "failed";
+                    criterion.details = "Vulnerabilities detected — run npm audit for details";
+                }
             }
             else if (hasSafety) {
-                const result = execSync(`pip safety check --json 2>&1`, {
-                    cwd: this.projectRoot,
-                    stdio: "pipe",
-                });
-                criterion.status = "passed";
+                try {
+                    await execAsync(`pip safety check --json`, {
+                        cwd: this.projectRoot,
+                    });
+                    criterion.status = "passed";
+                }
+                catch {
+                    criterion.status = "failed";
+                    criterion.details = "Safety check found issues";
+                }
             }
             else {
-                // Manual security checks for common patterns
                 const securityIssues = this.manualSecurityCheck(files);
                 if (securityIssues.length === 0) {
                     criterion.status = "passed";
@@ -280,15 +329,8 @@ export class VerificationPipeline {
             }
         }
         catch (error) {
-            // npm audit returns non-zero if vulnerabilities found
-            if (error instanceof Error && error.message.includes("vulnerabilities")) {
-                criterion.status = "failed";
-                criterion.details = "Vulnerabilities detected - see npm audit output";
-            }
-            else {
-                criterion.status = "failed";
-                criterion.details = error instanceof Error ? error.message : "Security check failed";
-            }
+            criterion.status = "failed";
+            criterion.details = error instanceof Error ? error.message : "Security check failed";
         }
         criteria.push(criterion);
         return criteria;
@@ -313,10 +355,7 @@ export class VerificationPipeline {
                 continue;
             }
             try {
-                const content = execSync(`cat "${join(this.projectRoot, file)}"`, {
-                    encoding: "utf-8",
-                    stdio: "pipe",
-                });
+                const content = readFileSync(join(this.projectRoot, file), "utf-8");
                 for (const { pattern, message } of dangerousPatterns) {
                     if (pattern.test(content)) {
                         issues.push(`[${file}] ${message}`);
@@ -340,11 +379,21 @@ export class VerificationPipeline {
                 description: criterionText,
                 type: "behavior",
                 status: "pending",
-                details: "Manual verification required",
+                details: "Behavior verification requires running the application",
             };
-            // This is a placeholder - actual behavior verification
-            // would require more sophisticated analysis
-            // For now, mark as pending for manual review
+            // Check if criterion mentions specific files — verify they exist
+            const fileMatch = criterionText.match(/`([^`]+)`/);
+            if (fileMatch) {
+                const filePath = join(this.projectRoot, fileMatch[1]);
+                if (!existsSync(filePath)) {
+                    criterion.status = "failed";
+                    criterion.details = `Referenced file does not exist: ${fileMatch[1]}`;
+                }
+                else {
+                    criterion.status = "passed";
+                    criterion.details = `Referenced file exists: ${fileMatch[1]}`;
+                }
+            }
             verificationCriteria.push(criterion);
         }
         return verificationCriteria;
@@ -362,9 +411,8 @@ export class VerificationPipeline {
                 // Extract file from criterion id
                 const fileMatch = criterion.id.match(/^lint-(.+)$/);
                 if (fileMatch) {
-                    execSync(`npx prettier --write "${fileMatch[1]}" 2>&1`, {
+                    await execAsync(`npx prettier --write "${fileMatch[1]}"`, {
                         cwd: this.projectRoot,
-                        stdio: "pipe",
                     });
                     return true;
                 }

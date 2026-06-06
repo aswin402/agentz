@@ -24,6 +24,7 @@ export const AgentTypeSchema = z.enum([
     "refactor",
     "debugger",
     "vision",
+    "researcher",
 ]);
 export const SubagentStatusSchema = z.enum([
     "spawned",
