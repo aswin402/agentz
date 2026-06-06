@@ -146,11 +146,9 @@ export const DEFAULT_MODEL_CHAINS = {
     },
     vision: {
         modelChain: [
-            { provider: "google", model: "gemini-2.5-flash", reason: "Primary vision - Google AI Studio Gemini 2.5 Flash" },
-            { provider: "openrouter", model: "google/gemini-2.5-flash", reason: "Fallback Gemini 2.5 Flash on OpenRouter" },
+            { provider: "openrouter", model: "google/gemini-2.5-flash-lite", reason: "Primary Vision - Gemini 2.5 Flash Lite via OpenRouter" },
             { provider: "nvidia", model: "meta/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on NVIDIA" },
             { provider: "openrouter", model: "meta-llama/llama-3.2-90b-vision-instruct", reason: "Fallback Llama 3.2 90B Vision on OpenRouter" },
-            { provider: "openrouter", model: "google/gemini-2.5-flash-lite", reason: "Fallback Gemini 2.5 Flash Lite on OpenRouter" },
             { provider: "openrouter", model: "google/gemini-3.1-flash-lite", reason: "Fallback Gemini 3.1 Flash Lite on OpenRouter" },
         ],
         timeoutSeconds: 60,

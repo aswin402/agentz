@@ -216,14 +216,9 @@
     "vision": {
       "modelChain": [
         {
-          "provider": "google",
-          "model": "gemini-2.5-flash",
-          "reason": "Primary vision - Google AI Studio Gemini 2.5 Flash"
-        },
-        {
           "provider": "openrouter",
-          "model": "google/gemini-2.5-flash",
-          "reason": "Fallback Gemini 2.5 Flash on OpenRouter"
+          "model": "google/gemini-2.5-flash-lite",
+          "reason": "Primary Vision - Gemini 2.5 Flash Lite via OpenRouter"
         },
         {
           "provider": "nvidia",
@@ -234,11 +229,6 @@
           "provider": "openrouter",
           "model": "meta-llama/llama-3.2-90b-vision-instruct",
           "reason": "Fallback Llama 3.2 90B Vision on OpenRouter"
-        },
-        {
-          "provider": "openrouter",
-          "model": "google/gemini-2.5-flash-lite",
-          "reason": "Fallback Gemini 2.5 Flash Lite on OpenRouter"
         },
         {
           "provider": "openrouter",
